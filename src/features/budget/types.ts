@@ -1,0 +1,47 @@
+export type CategoryType = 'income' | 'expense'
+export type CommitmentFrequency = 'once' | 'weekly' | 'monthly' | 'yearly'
+export type CommitmentStatus = 'active' | 'paused' | 'completed'
+
+export type Category = {
+  id: string
+  user_id: string
+  name: string
+  color: string
+  type: CategoryType
+  created_at: string
+}
+
+export type Transaction = {
+  id: string
+  user_id: string
+  category_id: string | null
+  amount: number
+  description: string
+  occurred_at: string
+  created_at: string
+  category?: Pick<Category, 'name' | 'color' | 'type'> | null
+}
+
+export type Commitment = {
+  id: string
+  user_id: string
+  category_id: string | null
+  amount: number
+  description: string
+  due_date: string
+  frequency: CommitmentFrequency
+  status: CommitmentStatus
+  created_at: string
+  category?: Pick<Category, 'name' | 'color' | 'type'> | null
+}
+
+export type NewTransaction = Pick<Transaction, 'amount' | 'description' | 'occurred_at' | 'category_id'>
+export type NewCommitment = Pick<Commitment, 'amount' | 'description' | 'due_date' | 'frequency' | 'category_id'>
+
+export type BudgetSettings = {
+  user_id: string
+  monthly_income: number
+  reserve_amount: number
+  payday_day: number
+  updated_at: string
+}
