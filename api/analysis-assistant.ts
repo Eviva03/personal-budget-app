@@ -41,8 +41,11 @@ function isInsightList(value: unknown): value is string[] {
 function insightFrom(value: unknown): Insight | null {
   if (!value || typeof value !== 'object') return null
   const insight = value as Partial<Insight>
-  if (typeof insight.summary !== 'string' || insight.summary.length === 0 || insight.summary.length > 420 || !isInsightList(insight.risks) || !isInsightList(insight.anomalies) || !isInsightList(insight.recommendations)) return null
-  return { summary: insight.summary, risks: insight.risks, anomalies: insight.anomalies, recommendations: insight.recommendations }
+  const risks = insight.risks ?? []
+  const anomalies = insight.anomalies ?? []
+  const recommendations = insight.recommendations ?? []
+  if (typeof insight.summary !== 'string' || insight.summary.length === 0 || insight.summary.length > 420 || !isInsightList(risks) || !isInsightList(anomalies) || !isInsightList(recommendations)) return null
+  return { summary: insight.summary, risks, anomalies, recommendations }
 }
 
 function geminiFailureMessage(status: number) {
@@ -135,10 +138,13 @@ export default async function handler(request: ApiRequest, response: ApiResponse
     const body = await geminiResponse.json() as { candidates?: { content?: { parts?: { text?: string }[] } }[] }
     const text = body.candidates?.[0]?.content?.parts?.[0]?.text
     if (!text) return send(response, { error: 'L assistant n a renvoye aucune analyse.' }, 502)
-    const insight = insightFrom(JSON.parse(text.trim().replace(/^```json\s*|\s*```$/g, '')))
+    const parsed = JSON.parse(text.trim().replace(/^```json\s*|\s*```$/g, ''))
+    const insight = insightFrom(parsed)
+    if (!insight) console.error('Gemini budget analysis response did not match the insight schema', { response: text.slice(0, 1_000) })
     if (!insight) return send(response, { error: 'La reponse de l assistant est invalide.' }, 502)
     return send(response, { insight, estimatedMonthlyCostEur: allowance.estimated_cost_eur, costWarning: allowance.estimated_cost_eur >= 3 })
-  } catch {
+  } catch (error) {
+    console.error('Gemini budget analysis response could not be processed', { error: error instanceof Error ? error.message : String(error) })
     return send(response, { error: 'La reponse de l assistant est invalide.' }, 502)
   }
 }
