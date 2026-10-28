@@ -12,6 +12,7 @@ import { HistoryPage } from './pages/HistoryPage'
 import { ProfilePage } from './pages/ProfilePage'
 import { TransactionsPage } from './pages/TransactionsPage'
 import { CategoriesPage } from './pages/CategoriesPage'
+import { DiscoverPage } from './pages/DiscoverPage'
 
 function App() {
   const { user } = useAuth()
@@ -29,6 +30,7 @@ function App() {
           <Route path="/categories" element={<CategoriesPage />} />
         </Route>
         <Route path="/profil" element={<ProfilePage />} />
+        <Route path="/decouvrir" element={<DiscoverPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       {user && <button className="global-add" type="button" aria-label="Ajouter une donnee budget" onClick={() => setIsAdding(true)}>

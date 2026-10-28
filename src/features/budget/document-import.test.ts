@@ -16,6 +16,23 @@ describe('parseTransactionsCsv', () => {
     expect(preview.valid).toEqual([{ occurred_at: '2026-06-11', description: 'THE LINUX FOUNDATION 1 LETTERMAN DRIVE', amount: 888.04, category_id: null }])
   })
 
+  it('detects Revolut-style rows without bank-specific column headings', () => {
+    const preview = parseTransactionsPdfText('Statement\n2026-10-01 UBER TRIP -18,20 EUR\n2026-10-02 PAYPAL *SERVICE -32.50 EUR')
+    expect(preview.valid).toEqual([
+      { occurred_at: '2026-10-01', description: 'UBER TRIP', amount: 18.2, category_id: null },
+      { occurred_at: '2026-10-02', description: 'PAYPAL *SERVICE', amount: 32.5, category_id: null },
+    ])
+  })
+
+  it('detects Revolut French statement rows and ignores the closing balance', () => {
+    const preview = parseTransactionsPdfText('Transactions du compte Date Description Argent sortant Argent entrant Solde 22 oct. 2026 Retrait depuis une Pocket 4,00€ 24,65€ 22 oct. 2026 Paiement envoyé par XXX 250,00€ 270,65€ 23 oct. 2026 Virement de XXX 148,00€ 148,65€')
+    expect(preview.valid).toEqual([
+      { occurred_at: '2026-10-22', description: 'Retrait depuis une Pocket', amount: 4, category_id: null },
+      { occurred_at: '2026-10-22', description: 'Paiement envoyé par XXX', amount: 250, category_id: null },
+      { occurred_at: '2026-10-23', description: 'Virement de XXX', amount: 148, category_id: null },
+    ])
+  })
+
   it('normalizes labels when comparing import duplicates', () => {
     expect(transactionFingerprint({ occurred_at: '2026-06-11', description: 'THE  LINUX  FONDATION', amount: 24.5, category_id: null })).toBe(transactionFingerprint({ occurred_at: '2026-06-11', description: 'the linux fondation', amount: 24.5, category_id: null }))
   })

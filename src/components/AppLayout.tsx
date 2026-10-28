@@ -1,4 +1,4 @@
-import { BarChart3, FolderCog, HandCoins, History, House, Settings2, WalletCards } from 'lucide-react'
+import { BarChart3, CircleHelp, FolderCog, HandCoins, History, House, Settings2, WalletCards } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { NavLink } from 'react-router-dom'
 import { useAuth } from '../features/auth/useAuth'
@@ -13,6 +13,7 @@ const navigation = [
   { to: '/analyse', label: 'Analyse', icon: BarChart3 },
   { to: '/historique', label: 'Historique', icon: History },
   { to: '/categories', label: 'Categories', icon: FolderCog },
+  { to: '/decouvrir', label: 'Decouvrir', icon: CircleHelp },
   { to: '/profil', label: 'Profil', icon: Settings2 },
 ]
 

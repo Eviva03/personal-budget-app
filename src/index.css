@@ -115,7 +115,32 @@ code {
 }
 */
 
-:root { color: #18212b; background: #f4f7fb; font-family: 'Space Grotesk', sans-serif; font-synthesis: none; text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased; }
+:root {
+  --ink: #18212b;
+  --muted: #637180;
+  --surface: rgb(255 255 255 / 84%);
+  --line: #d7e1eb;
+  --mint: #75d7b6;
+  --teal: #387c70;
+  --coral: #f5785d;
+  --sun: #f6bf55;
+  color: var(--ink);
+  background: #f4f7fb;
+  font-family: "Space Grotesk", sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
 * { box-sizing: border-box; }
-body { margin: 0; min-width: 320px; min-height: 100svh; background-image: linear-gradient(90deg, rgb(20 33 49 / 3%) 1px, transparent 1px), linear-gradient(rgb(20 33 49 / 3%) 1px, transparent 1px); background-size: 32px 32px; }
+html { background: #f4f7fb; }
+body {
+  min-width: 320px;
+  min-height: 100svh;
+  margin: 0;
+  background-color: #f4f7fb;
+  background-image: linear-gradient(90deg, rgb(20 33 49 / 4%) 1px, transparent 1px), linear-gradient(rgb(20 33 49 / 4%) 1px, transparent 1px), linear-gradient(135deg, rgb(117 215 182 / 10%), transparent 42%);
+  background-size: 28px 28px, 28px 28px, 100% 100%;
+}
 button, input, select { font: inherit; }
+button { -webkit-tap-highlight-color: transparent; }
+::selection { color: #18212b; background: #a7e8d0; }

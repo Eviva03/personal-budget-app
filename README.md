@@ -77,7 +77,13 @@ GEMINI_API_KEY=YOUR_GEMINI_API_KEY
 GEMINI_MODEL=YOUR_APPROVED_GEMINI_FLASH_MODEL
 ```
 
-La fonction `api/import-assistant.ts` limite chaque utilisateur a 20 demandes par mois. Son compteur global estime 0,01 EUR par demande, signale 3 EUR et bloque les nouvelles demandes a 5 EUR. L'assistant renvoie seulement des propositions de categories, qui restent a valider par l'utilisateur.
+Les fonctions `api/import-assistant.ts`, `api/document-assistant.ts` et `api/analysis-assistant.ts` partagent une limite de 20 demandes par utilisateur et par mois. Leur compteur global estime 0,01 EUR par demande, signale 3 EUR et bloque les nouvelles demandes a 5 EUR.
+
+- L'assistant d'import propose des categories pour les lignes ambigues.
+- L'assistant documentaire propose une lecture structuree d'un releve, d'une facture ou d'un ticket.
+- Depuis la page **Analyse**, l'analyse intelligente produit sur demande un resume, des risques avant la paie, des depenses inhabituelles et des pistes budgetaires. Elle ne modifie jamais les donnees.
+
+Chaque resultat reste une proposition a verifier par l'utilisateur.
 
 ## Gestion du budget
 
