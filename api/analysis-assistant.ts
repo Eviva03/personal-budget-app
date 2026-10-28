@@ -45,6 +45,13 @@ function insightFrom(value: unknown): Insight | null {
   return { summary: insight.summary, risks: insight.risks, anomalies: insight.anomalies, recommendations: insight.recommendations }
 }
 
+function geminiFailureMessage(status: number) {
+  if (status === 400 || status === 404) return 'Le modele Gemini configure est indisponible.'
+  if (status === 401 || status === 403) return 'La cle Gemini ne peut pas utiliser le modele configure.'
+  if (status === 429) return 'Gemini limite temporairement les analyses. Reessayez dans quelques minutes.'
+  return 'Gemini est indisponible pour le moment. Reessayez plus tard.'
+}
+
 export default async function handler(request: ApiRequest, response: ApiResponse) {
   if (request.method !== 'POST') return send(response, { error: 'Method not allowed.' }, 405)
   const supabaseUrl = process.env.SUPABASE_URL
@@ -110,7 +117,11 @@ export default async function handler(request: ApiRequest, response: ApiResponse
   const prompt = `Tu es un assistant d analyse de budget personnel en francais. Base-toi exclusivement sur le resume chiffre fourni. Ne crees et ne modifies jamais de donnees. Ne donne pas de conseil financier professionnel, seulement des pistes budgetaires prudentes. Reponds uniquement en JSON sans markdown: {"summary":"phrase factuelle moins de 420 caracteres","risks":["maximum 3 risques concrets"],"anomalies":["maximum 3 depenses ou categories inhabituelles, tableau vide si aucune"],"recommendations":["maximum 3 actions concretes et non prescriptives"]}. Ne pretend pas connaitre une information absente. Resume: ${JSON.stringify(snapshot)}`
   try {
     const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(geminiModel)}:generateContent?key=${encodeURIComponent(geminiKey)}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: 'application/json', temperature: 0.1, maxOutputTokens: 700 } }) })
-    if (!geminiResponse.ok) return send(response, { error: 'L assistant ne peut pas analyser votre budget.' }, 502)
+    if (!geminiResponse.ok) {
+      const providerResponse = await geminiResponse.text()
+      console.error('Gemini budget analysis request failed', { status: geminiResponse.status, providerResponse: providerResponse.slice(0, 1_000) })
+      return send(response, { error: geminiFailureMessage(geminiResponse.status) }, 502)
+    }
     const body = await geminiResponse.json() as { candidates?: { content?: { parts?: { text?: string }[] } }[] }
     const text = body.candidates?.[0]?.content?.parts?.[0]?.text
     if (!text) return send(response, { error: 'L assistant n a renvoye aucune analyse.' }, 502)
