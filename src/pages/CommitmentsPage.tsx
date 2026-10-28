@@ -1,16 +1,78 @@
 import { Pencil, Trash2, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useAuth } from '../features/auth/useAuth'
+import { isCommitmentFinished } from '../features/budget/budget-engine'
 import { deleteCommitment, listCategories, listCommitments, updateCommitment } from '../features/budget/budget-repository'
 import { formatAmount } from '../features/budget/money'
 import type { Category, Commitment, NewCommitment } from '../features/budget/types'
 import './pages.css'
 
 const frequencyLabels = { once: 'Unique', weekly: 'Hebdomadaire', monthly: 'Mensuelle', yearly: 'Annuelle' }
+
+function installmentLabel(item: Commitment) {
+  if (item.frequency !== 'monthly' || !item.installment_count) return frequencyLabels[item.frequency]
+  const firstDueDate = new Date(`${item.due_date}T00:00:00`)
+  const today = new Date()
+  const monthDistance = (today.getFullYear() - firstDueDate.getFullYear()) * 12 + today.getMonth() - firstDueDate.getMonth()
+  return `Mensualite ${Math.max(1, monthDistance + 1)}/${item.installment_count}`
+}
+
 export function CommitmentsPage() {
-	const { user } = useAuth(); const [items, setItems] = useState<Commitment[]>([]); const [categories, setCategories] = useState<Category[]>([]); const [editing, setEditing] = useState<Commitment | null>(null); const [error, setError] = useState(''); const [loading, setLoading] = useState(true); const [saving, setSaving] = useState(false)
-	useEffect(() => { if (!user) return; const load = () => { setLoading(true); void Promise.all([listCommitments(user.id), listCategories(user.id)]).then(([commitments, availableCategories]) => { setItems(commitments); setCategories(availableCategories) }).catch((loadError: unknown) => setError(loadError instanceof Error ? loadError.message : 'Impossible de charger les engagements.')).finally(() => setLoading(false)) }; load(); window.addEventListener('budget-data-changed', load); return () => window.removeEventListener('budget-data-changed', load) }, [user])
-	async function saveEdit() { if (!user || !editing || !editing.description.trim() || editing.amount <= 0) return; setSaving(true); try { const changes: NewCommitment = { description: editing.description.trim(), amount: editing.amount, due_date: editing.due_date, frequency: editing.frequency, category_id: editing.category_id }; await updateCommitment(user.id, editing.id, changes); setItems((current) => current.map((item) => item.id === editing.id ? { ...item, ...changes } : item)); setEditing(null); window.dispatchEvent(new Event('budget-data-changed')) } catch (requestError) { setError(requestError instanceof Error ? requestError.message : 'Impossible de modifier l engagement.') } finally { setSaving(false) } }
-	async function remove(item: Commitment) { if (!user || !window.confirm(`Supprimer « ${item.description} » ?`)) return; try { await deleteCommitment(user.id, item.id); setItems((current) => current.filter((entry) => entry.id !== item.id)); window.dispatchEvent(new Event('budget-data-changed')) } catch (requestError) { setError(requestError instanceof Error ? requestError.message : 'Impossible de supprimer l engagement.') } }
-	return <section className="page-placeholder"><p className="eyebrow">A VENIR</p><h1>Engagements</h1><p className="description">Suivez les depenses deja prevues et leurs prochaines echeances.</p>{loading ? <p>Chargement...</p> : error ? <p className="form-message">{error}</p> : items.length === 0 ? <div className="placeholder-card"><span className="status-dot" /><p>Aucun engagement actif. Utilisez le bouton + pour en ajouter un.</p></div> : <ul className="data-list transaction-list">{items.map((item) => <li key={item.id}><div><strong>{item.description}</strong><span>{new Date(`${item.due_date}T00:00:00`).toLocaleDateString('fr-FR')} · {frequencyLabels[item.frequency]} · {categories.find((category) => category.id === item.category_id)?.name ?? 'Sans categorie'}</span></div><strong>{formatAmount(item.amount)}</strong><div className="row-actions"><button className="icon-button" type="button" title="Modifier" aria-label={`Modifier ${item.description}`} onClick={() => setEditing({ ...item })}><Pencil size={16} /></button><button className="icon-button danger-button" type="button" title="Supprimer" aria-label={`Supprimer ${item.description}`} onClick={() => void remove(item)}><Trash2 size={16} /></button></div></li>)}</ul>}{editing && <div className="modal-backdrop" role="presentation" onMouseDown={() => setEditing(null)}><section className="entry-modal" role="dialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}><button className="icon-button" type="button" onClick={() => setEditing(null)} aria-label="Fermer"><X size={20} /></button><p className="eyebrow">ENGAGEMENT</p><h2>Modifier</h2><div className="entry-form"><label htmlFor="commitment-description">Description</label><input id="commitment-description" value={editing.description} onChange={(event) => setEditing({ ...editing, description: event.target.value })} maxLength={200} /><label htmlFor="commitment-amount">Montant</label><input id="commitment-amount" type="number" min="0.01" step="0.01" value={editing.amount} onChange={(event) => setEditing({ ...editing, amount: Number(event.target.value) })} /><label htmlFor="commitment-date">Echeance</label><input id="commitment-date" type="date" value={editing.due_date} onChange={(event) => setEditing({ ...editing, due_date: event.target.value })} /><label htmlFor="commitment-frequency">Frequence</label><select id="commitment-frequency" value={editing.frequency} onChange={(event) => setEditing({ ...editing, frequency: event.target.value as Commitment['frequency'] })}>{Object.entries(frequencyLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select><label htmlFor="commitment-category">Categorie</label><select id="commitment-category" value={editing.category_id ?? ''} onChange={(event) => setEditing({ ...editing, category_id: event.target.value || null })}><option value="">Sans categorie</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select><button className="primary-button" type="button" onClick={() => void saveEdit()} disabled={saving}>{saving ? 'Enregistrement...' : 'Enregistrer'}</button></div></section></div>}</section>
+  const { user } = useAuth()
+  const [items, setItems] = useState<Commitment[]>([])
+  const [categories, setCategories] = useState<Category[]>([])
+  const [editing, setEditing] = useState<Commitment | null>(null)
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const activeItems = items.filter((item) => !isCommitmentFinished(item))
+
+  useEffect(() => {
+    if (!user) return
+    const load = () => {
+      setLoading(true)
+      void Promise.all([listCommitments(user.id), listCategories(user.id)])
+        .then(([commitments, availableCategories]) => { setItems(commitments); setCategories(availableCategories) })
+        .catch((loadError: unknown) => setError(loadError instanceof Error ? loadError.message : 'Impossible de charger les engagements.'))
+        .finally(() => setLoading(false))
+    }
+    load()
+    window.addEventListener('budget-data-changed', load)
+    return () => window.removeEventListener('budget-data-changed', load)
+  }, [user])
+
+  async function saveEdit() {
+    if (!user || !editing || !editing.description.trim() || editing.amount <= 0) return
+    setSaving(true)
+    try {
+      const changes: NewCommitment = {
+        description: editing.description.trim(), amount: editing.amount, due_date: editing.due_date,
+        frequency: editing.frequency, installment_count: editing.frequency === 'monthly' ? editing.installment_count ?? null : null,
+        category_id: editing.category_id,
+      }
+      await updateCommitment(user.id, editing.id, changes)
+      setItems((current) => current.map((item) => item.id === editing.id ? { ...item, ...changes } : item))
+      setEditing(null)
+      window.dispatchEvent(new Event('budget-data-changed'))
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : 'Impossible de modifier l engagement.')
+    } finally { setSaving(false) }
+  }
+
+  async function remove(item: Commitment) {
+    if (!user || !window.confirm(`Supprimer « ${item.description} » ?`)) return
+    try {
+      await deleteCommitment(user.id, item.id)
+      setItems((current) => current.filter((entry) => entry.id !== item.id))
+      window.dispatchEvent(new Event('budget-data-changed'))
+    } catch (requestError) { setError(requestError instanceof Error ? requestError.message : 'Impossible de supprimer l engagement.') }
+  }
+
+  return <section className="page-placeholder">
+    <p className="eyebrow">A VENIR</p>
+    <h1>Engagements</h1>
+    <p className="description">Suivez les depenses deja prevues et leurs prochaines echeances.</p>
+    {loading ? <p>Chargement...</p> : error ? <p className="form-message">{error}</p> : activeItems.length === 0 ? <div className="placeholder-card"><span className="status-dot" /><p>Aucun engagement actif. Utilisez le bouton + pour en ajouter un.</p></div> : <ul className="data-list transaction-list">{activeItems.map((item) => <li key={item.id}><div><strong>{item.description}</strong><span>{new Date(`${item.due_date}T00:00:00`).toLocaleDateString('fr-FR')} · {installmentLabel(item)} · {categories.find((category) => category.id === item.category_id)?.name ?? 'Sans categorie'}</span></div><strong>{formatAmount(item.amount)}</strong><div className="row-actions"><button className="icon-button" type="button" title="Modifier" aria-label={`Modifier ${item.description}`} onClick={() => setEditing({ ...item })}><Pencil size={16} /></button><button className="icon-button danger-button" type="button" title="Supprimer" aria-label={`Supprimer ${item.description}`} onClick={() => void remove(item)}><Trash2 size={16} /></button></div></li>)}</ul>}
+    {editing && <div className="modal-backdrop" role="presentation" onMouseDown={() => setEditing(null)}><section className="entry-modal" role="dialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}><button className="icon-button" type="button" onClick={() => setEditing(null)} aria-label="Fermer"><X size={20} /></button><p className="eyebrow">ENGAGEMENT</p><h2>Modifier</h2><div className="entry-form"><label htmlFor="commitment-description">Description</label><input id="commitment-description" value={editing.description} onChange={(event) => setEditing({ ...editing, description: event.target.value })} maxLength={200} /><label htmlFor="commitment-amount">Montant par echeance</label><input id="commitment-amount" type="number" min="0.01" step="0.01" value={editing.amount} onChange={(event) => setEditing({ ...editing, amount: Number(event.target.value) })} /><label htmlFor="commitment-date">Premiere echeance</label><input id="commitment-date" type="date" value={editing.due_date} onChange={(event) => setEditing({ ...editing, due_date: event.target.value })} /><label htmlFor="commitment-frequency">Frequence</label><select id="commitment-frequency" value={editing.frequency} onChange={(event) => setEditing({ ...editing, frequency: event.target.value as Commitment['frequency'] })}>{Object.entries(frequencyLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>{editing.frequency === 'monthly' && <><label htmlFor="commitment-installments">Nombre de mensualites <small>(vide = sans fin)</small></label><input id="commitment-installments" type="number" min="2" step="1" value={editing.installment_count ?? ''} onChange={(event) => setEditing({ ...editing, installment_count: event.target.value ? Number(event.target.value) : null })} /></>}<label htmlFor="commitment-category">Categorie</label><select id="commitment-category" value={editing.category_id ?? ''} onChange={(event) => setEditing({ ...editing, category_id: event.target.value || null })}><option value="">Sans categorie</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select><button className="primary-button" type="button" onClick={() => void saveEdit()} disabled={saving}>{saving ? 'Enregistrement...' : 'Enregistrer'}</button></div></section></div>}
+  </section>
 }

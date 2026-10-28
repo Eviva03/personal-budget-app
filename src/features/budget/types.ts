@@ -30,13 +30,14 @@ export type Commitment = {
   description: string
   due_date: string
   frequency: CommitmentFrequency
+  installment_count?: number | null
   status: CommitmentStatus
   created_at: string
   category?: Pick<Category, 'name' | 'color' | 'type'> | null
 }
 
 export type NewTransaction = Pick<Transaction, 'amount' | 'description' | 'occurred_at' | 'category_id'>
-export type NewCommitment = Pick<Commitment, 'amount' | 'description' | 'due_date' | 'frequency' | 'category_id'>
+export type NewCommitment = Pick<Commitment, 'amount' | 'description' | 'due_date' | 'frequency' | 'installment_count' | 'category_id'>
 
 export type BudgetSettings = {
   user_id: string

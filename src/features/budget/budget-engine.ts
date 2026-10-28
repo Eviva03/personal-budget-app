@@ -21,8 +21,23 @@ function isInMonth(dateValue: string, referenceDate: Date) {
   return date.getFullYear() === referenceDate.getFullYear() && date.getMonth() === referenceDate.getMonth()
 }
 
+export function isCommitmentDueInMonth(commitment: Commitment, referenceDate: Date) {
+  if (commitment.frequency !== 'monthly' || !commitment.installment_count) return true
+  const firstDueDate = new Date(`${commitment.due_date}T00:00:00`)
+  const monthDistance = (referenceDate.getFullYear() - firstDueDate.getFullYear()) * 12 + referenceDate.getMonth() - firstDueDate.getMonth()
+  return monthDistance >= 0 && monthDistance < commitment.installment_count
+}
+
+export function isCommitmentFinished(commitment: Commitment, referenceDate = new Date()) {
+  if (commitment.frequency !== 'monthly' || !commitment.installment_count) return false
+  const firstDueDate = new Date(`${commitment.due_date}T00:00:00`)
+  const monthDistance = (referenceDate.getFullYear() - firstDueDate.getFullYear()) * 12 + referenceDate.getMonth() - firstDueDate.getMonth()
+  return monthDistance >= commitment.installment_count
+}
+
 function monthlyCommitmentAmount(commitment: Commitment, referenceDate: Date) {
   if (commitment.status !== 'active') return 0
+  if (!isCommitmentDueInMonth(commitment, referenceDate)) return 0
   if (commitment.frequency === 'weekly') return commitment.amount * 52 / 12
   if (commitment.frequency === 'monthly') return commitment.amount
   if (commitment.frequency === 'yearly') return commitment.amount / 12
