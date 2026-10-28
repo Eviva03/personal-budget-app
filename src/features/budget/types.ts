@@ -1,4 +1,5 @@
 export type CategoryType = 'income' | 'expense'
+export type CategoryIconName = 'banknote' | 'bus' | 'credit-card' | 'dumbbell' | 'house' | 'shopping-bag' | 'smartphone' | 'tag' | 'utensils'
 export type CommitmentFrequency = 'once' | 'weekly' | 'monthly' | 'yearly'
 export type CommitmentStatus = 'active' | 'paused' | 'completed'
 
@@ -7,6 +8,7 @@ export type Category = {
   user_id: string
   name: string
   color: string
+  icon?: CategoryIconName
   type: CategoryType
   created_at: string
 }

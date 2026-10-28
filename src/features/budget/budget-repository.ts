@@ -12,13 +12,13 @@ export async function listCategories(userId: string) {
   return data as Category[]
 }
 
-export async function createCategory(userId: string, category: Pick<Category, 'name' | 'color' | 'type'>) {
-  const { data, error } = await client().from('categories').insert({ ...category, user_id: userId }).select().single()
+export async function createCategory(userId: string, category: Pick<Category, 'name' | 'color' | 'icon' | 'type'>) {
+  const { data, error } = await client().from('categories').insert({ ...category, icon: category.icon ?? 'tag', user_id: userId }).select().single()
   if (error) throw error
   return data as Category
 }
 
-export async function updateCategory(userId: string, categoryId: string, changes: Partial<Pick<Category, 'name' | 'color' | 'type'>>) {
+export async function updateCategory(userId: string, categoryId: string, changes: Partial<Pick<Category, 'name' | 'color' | 'icon' | 'type'>>) {
   const { data, error } = await client().from('categories').update(changes).eq('id', categoryId).eq('user_id', userId).select().single()
   if (error) throw error
   return data as Category
@@ -69,6 +69,13 @@ export async function createCommitment(userId: string, commitment: NewCommitment
   const { data, error } = await client().from('commitments').insert({ ...commitment, user_id: userId }).select().single()
   if (error) throw error
   return data as Commitment
+}
+
+export async function createCommitments(userId: string, commitments: NewCommitment[]) {
+  if (commitments.length === 0) return []
+  const { data, error } = await client().from('commitments').insert(commitments.map((commitment) => ({ ...commitment, user_id: userId }))).select()
+  if (error) throw error
+  return data as Commitment[]
 }
 
 export async function updateCommitment(userId: string, commitmentId: string, changes: Partial<NewCommitment>) {

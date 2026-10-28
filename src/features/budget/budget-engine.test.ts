@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { calculateBudget } from './budget-engine'
+import { calculateBudget, isCommitmentFinished } from './budget-engine'
 import type { Commitment, Transaction } from './types'
 
 const transaction = (amount: number, occurred_at: string): Transaction => ({ id: 't', user_id: 'u', category_id: null, amount, description: 'Test', occurred_at, created_at: '' })
@@ -19,5 +19,12 @@ describe('calculateBudget', () => {
     const installment = { ...commitment(100, 'monthly', '2026-11-05'), installment_count: 3 }
     expect(calculateBudget({ monthlyIncome: 1000, reserve: 0, transactions: [], commitments: [installment], referenceDate: new Date('2026-12-10') }).projectedCommitments).toBe(100)
     expect(calculateBudget({ monthlyIncome: 1000, reserve: 0, transactions: [], commitments: [installment], referenceDate: new Date('2027-02-10') }).projectedCommitments).toBe(0)
+  })
+
+  it('keeps an August four-installment plan active through November', () => {
+    const phone = { ...commitment(30, 'monthly', '2026-08-28'), installment_count: 4 }
+    expect(isCommitmentFinished(phone, new Date('2026-10-28'))).toBe(false)
+    expect(calculateBudget({ monthlyIncome: 1000, reserve: 0, transactions: [], commitments: [phone], referenceDate: new Date('2026-10-28') }).projectedCommitments).toBe(30)
+    expect(isCommitmentFinished(phone, new Date('2026-12-01'))).toBe(true)
   })
 })

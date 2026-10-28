@@ -1,4 +1,5 @@
 import type { Commitment, Transaction } from './types'
+import { isCommitmentFinished } from './budget-engine'
 
 export type UpcomingCommitment = Commitment & { nextDueDate: string }
 export type SpendingPoint = { label: string; amount: number }
@@ -13,6 +14,7 @@ export function nextPayday(paydayDay: number, referenceDate = new Date()) {
 }
 
 function nextOccurrence(commitment: Commitment, referenceDate: Date) {
+  if (isCommitmentFinished(commitment, referenceDate)) return null
   const due = localDate(commitment.due_date)
   if (commitment.frequency === 'once') return due >= referenceDate ? due : null
   const next = new Date(due)

@@ -66,6 +66,19 @@ Ne placez jamais dans un fichier frontend un mot de passe de base de donnees, un
 - Les PDF contenant du texte affichent un apercu a verifier. Pour un PDF scanne, l'OCR s'execute localement dans le navigateur, sans cle ni service distant.
 - L'OCR est volontairement limite aux trois premieres pages et son texte n'est jamais importe automatiquement: il doit etre controle avant toute saisie.
 
+## Assistant Gemini optionnel
+
+L'assistant est appele uniquement depuis une fonction serveur et ne doit jamais recevoir une cle dans le navigateur. Avant de l'activer, executez la migration `supabase/migrations/20261028010000_create_ai_import_usage.sql`, puis ajoutez ces variables uniquement dans l'environnement Vercel:
+
+```bash
+SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
+SUPABASE_PUBLISHABLE_KEY=YOUR_SUPABASE_PUBLISHABLE_KEY
+GEMINI_API_KEY=YOUR_GEMINI_API_KEY
+GEMINI_MODEL=YOUR_APPROVED_GEMINI_FLASH_MODEL
+```
+
+La fonction `api/import-assistant.ts` limite chaque utilisateur a 20 demandes par mois. Son compteur global estime 0,01 EUR par demande, signale 3 EUR et bloque les nouvelles demandes a 5 EUR. L'assistant renvoie seulement des propositions de categories, qui restent a valider par l'utilisateur.
+
 ## Gestion du budget
 
 - La page **Categories** permet de creer, renommer, colorer et supprimer les categories personnelles.
