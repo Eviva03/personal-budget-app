@@ -52,6 +52,16 @@ function geminiFailureMessage(status: number) {
   return 'Gemini est indisponible pour le moment. Reessayez plus tard.'
 }
 
+async function generateAnalysis(url: string, body: string) {
+  let geminiResponse: Response | undefined
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    geminiResponse = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body })
+    if (geminiResponse.ok || (geminiResponse.status !== 429 && geminiResponse.status !== 503) || attempt === 2) return geminiResponse
+    await new Promise((resolve) => setTimeout(resolve, 600 * (attempt + 1)))
+  }
+  throw new Error('Gemini did not return a response.')
+}
+
 export default async function handler(request: ApiRequest, response: ApiResponse) {
   if (request.method !== 'POST') return send(response, { error: 'Method not allowed.' }, 405)
   const supabaseUrl = process.env.SUPABASE_URL
@@ -116,7 +126,7 @@ export default async function handler(request: ApiRequest, response: ApiResponse
   }
   const prompt = `Tu es un assistant d analyse de budget personnel en francais. Base-toi exclusivement sur le resume chiffre fourni. Ne crees et ne modifies jamais de donnees. Ne donne pas de conseil financier professionnel, seulement des pistes budgetaires prudentes. Reponds uniquement en JSON sans markdown: {"summary":"phrase factuelle moins de 420 caracteres","risks":["maximum 3 risques concrets"],"anomalies":["maximum 3 depenses ou categories inhabituelles, tableau vide si aucune"],"recommendations":["maximum 3 actions concretes et non prescriptives"]}. Ne pretend pas connaitre une information absente. Resume: ${JSON.stringify(snapshot)}`
   try {
-    const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(geminiModel)}:generateContent?key=${encodeURIComponent(geminiKey)}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: 'application/json', temperature: 0.1, maxOutputTokens: 700 } }) })
+    const geminiResponse = await generateAnalysis(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(geminiModel)}:generateContent?key=${encodeURIComponent(geminiKey)}`, JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: 'application/json', temperature: 0.1, maxOutputTokens: 700 } }))
     if (!geminiResponse.ok) {
       const providerResponse = await geminiResponse.text()
       console.error('Gemini budget analysis request failed', { status: geminiResponse.status, providerResponse: providerResponse.slice(0, 1_000) })
