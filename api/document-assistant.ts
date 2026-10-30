@@ -1,4 +1,4 @@
-import { createAuthenticatedNeonClient, hasAuthenticatedUser } from '../server/neon'
+import { createAuthenticatedNeonClient, hasAuthenticatedUser } from './neon.js'
 
 type CategoryInput = { id: string; name: string; type: 'income' | 'expense' }
 type AssistantRequest = { text: string; categories: CategoryInput[] }

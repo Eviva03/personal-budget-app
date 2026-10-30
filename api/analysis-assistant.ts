@@ -1,4 +1,4 @@
-import { createAuthenticatedNeonClient, hasAuthenticatedUser } from '../server/neon'
+import { createAuthenticatedNeonClient, hasAuthenticatedUser } from './neon.js'
 
 type ApiRequest = { method?: string; headers: { authorization?: string | string[] | undefined } }
 type ApiResponse = { status: (status: number) => ApiResponse; json: (body: unknown) => void }
