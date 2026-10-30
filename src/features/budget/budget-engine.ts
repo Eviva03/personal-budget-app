@@ -31,8 +31,10 @@ export function isCommitmentDueInMonth(commitment: Commitment, referenceDate: Da
 export function isCommitmentFinished(commitment: Commitment, referenceDate = new Date()) {
   if (commitment.frequency !== 'monthly' || !commitment.installment_count) return false
   const firstDueDate = new Date(`${commitment.due_date}T00:00:00`)
-  const monthDistance = (referenceDate.getFullYear() - firstDueDate.getFullYear()) * 12 + referenceDate.getMonth() - firstDueDate.getMonth()
-  return monthDistance >= commitment.installment_count
+  const finalDueDate = new Date(firstDueDate)
+  finalDueDate.setMonth(finalDueDate.getMonth() + commitment.installment_count - 1)
+  const today = new Date(referenceDate.getFullYear(), referenceDate.getMonth(), referenceDate.getDate())
+  return today > finalDueDate
 }
 
 function monthlyCommitmentAmount(commitment: Commitment, referenceDate: Date) {

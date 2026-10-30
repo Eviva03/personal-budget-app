@@ -12,5 +12,9 @@ describe('projection helpers', () => {
     const phone = { ...commitment('monthly', '2026-08-28'), installment_count: 4 }
     expect(commitmentsUntilPayday([phone], 5, new Date('2026-12-01'))).toEqual([])
   })
+  it('excludes an installment plan on the day after its final payment', () => {
+    const phone = { ...commitment('monthly', '2026-07-29'), installment_count: 4 }
+    expect(commitmentsUntilPayday([phone], 28, new Date('2026-10-30'))).toEqual([])
+  })
   it('groups current-month transactions by day', () => expect(spendingByDay([transaction(10, '2026-10-02'), transaction(5, '2026-10-02'), transaction(9, '2026-09-30')], new Date('2026-10-27'))).toEqual([{ label: '2 oct.', amount: 15 }]))
 })

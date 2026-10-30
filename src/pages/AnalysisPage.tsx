@@ -1,5 +1,6 @@
 import {
   CalendarDays,
+  CircleDollarSign,
   ReceiptText,
   Sparkles,
   TrendingDown,
@@ -37,6 +38,8 @@ export function AnalysisPage() {
   const [spending, setSpending] = useState<SpendingPoint[]>([]);
   const [payday, setPayday] = useState<Date | null>(null);
   const [daysUntilPayday, setDaysUntilPayday] = useState(0);
+  const [monthlyIncome, setMonthlyIncome] = useState(0);
+  const [reserveAmount, setReserveAmount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [insight, setInsight] = useState<AnalysisInsight | null>(null);
@@ -63,6 +66,8 @@ export function AnalysisPage() {
           return;
         }
 
+        setMonthlyIncome(settings.monthly_income);
+        setReserveAmount(settings.reserve_amount);
         const categoryById = new Map(
           categories.map((category) => [category.id, category]),
         );
@@ -142,6 +147,7 @@ export function AnalysisPage() {
     (total, item) => total + item.amount,
     0,
   );
+  const availableUntilPayday = monthlyIncome - reserveAmount - upcomingTotal;
   return (
     <section className="analysis-page">
       <p className="eyebrow">COMPRENDRE</p>
@@ -178,6 +184,11 @@ export function AnalysisPage() {
               <TrendingDown size={19} />
               <span>Depense ce mois</span>
               <strong>{formatAmount(spendingTotal)}</strong>
+            </article>
+            <article className="analysis-metric">
+              <CircleDollarSign size={19} />
+              <span>Reste avant paie</span>
+              <strong>{formatAmount(availableUntilPayday)}</strong>
             </article>
             <article className="analysis-metric">
               <ReceiptText size={19} />
