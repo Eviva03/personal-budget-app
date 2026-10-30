@@ -34,18 +34,25 @@ function nextCommitmentDate(commitment: Commitment, today: Date) {
   return date
 }
 
-function isInsightList(value: unknown): value is string[] {
-  return Array.isArray(value) && value.length <= 3 && value.every((item) => typeof item === 'string' && item.length > 0 && item.length <= 220)
+function normalizedInsightList(value: unknown) {
+  if (!Array.isArray(value)) return []
+  return value
+    .filter((item): item is string => typeof item === 'string')
+    .map((item) => item.trim().slice(0, 220))
+    .filter(Boolean)
+    .slice(0, 3)
 }
 
 function insightFrom(value: unknown): Insight | null {
   if (!value || typeof value !== 'object') return null
   const insight = value as Partial<Insight>
-  const risks = insight.risks ?? []
-  const anomalies = insight.anomalies ?? []
-  const recommendations = insight.recommendations ?? []
-  if (typeof insight.summary !== 'string' || insight.summary.length === 0 || insight.summary.length > 420 || !isInsightList(risks) || !isInsightList(anomalies) || !isInsightList(recommendations)) return null
-  return { summary: insight.summary, risks, anomalies, recommendations }
+  if (typeof insight.summary !== 'string' || !insight.summary.trim()) return null
+  return {
+    summary: insight.summary.trim().slice(0, 420),
+    risks: normalizedInsightList(insight.risks),
+    anomalies: normalizedInsightList(insight.anomalies),
+    recommendations: normalizedInsightList(insight.recommendations),
+  }
 }
 
 function geminiFailureMessage(status: number) {
@@ -58,7 +65,12 @@ function geminiFailureMessage(status: number) {
 async function generateAnalysis(url: string, body: string) {
   let geminiResponse: Response | undefined
   for (let attempt = 0; attempt < 3; attempt += 1) {
-    geminiResponse = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body })
+    geminiResponse = await fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body,
+      signal: AbortSignal.timeout(15_000),
+    })
     if (geminiResponse.ok || (geminiResponse.status !== 429 && geminiResponse.status !== 503) || attempt === 2) return geminiResponse
     await new Promise((resolve) => setTimeout(resolve, 600 * (attempt + 1)))
   }
@@ -136,13 +148,13 @@ export default async function handler(request: ApiRequest, response: ApiResponse
     const body = await geminiResponse.json() as { candidates?: { content?: { parts?: { text?: string }[] } }[] }
     const text = body.candidates?.[0]?.content?.parts?.[0]?.text
     if (!text) return send(response, { error: 'L assistant n a renvoye aucune analyse.' }, 502)
-    const parsed = JSON.parse(text.trim().replace(/^```json\s*|\s*```$/g, ''))
+    const parsed = JSON.parse(text.trim().replace(/^```(?:json)?\s*|\s*```$/g, ''))
     const insight = insightFrom(parsed)
     if (!insight) console.error('Gemini budget analysis response did not match the insight schema', { response: text.slice(0, 1_000) })
     if (!insight) return send(response, { error: 'La reponse de l assistant est invalide.' }, 502)
     return send(response, { insight, estimatedMonthlyCostEur: allowance.estimated_cost_eur, costWarning: allowance.estimated_cost_eur >= 3 })
   } catch (error) {
     console.error('Gemini budget analysis response could not be processed', { error: error instanceof Error ? error.message : String(error) })
-    return send(response, { error: 'La reponse de l assistant est invalide.' }, 502)
+    return send(response, { error: 'Gemini ne repond pas pour le moment. Reessayez dans quelques instants.' }, 502)
   }
 }
