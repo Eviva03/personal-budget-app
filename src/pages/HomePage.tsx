@@ -11,7 +11,7 @@ import {
   listTransactions,
   saveBudgetSettings,
 } from "../features/budget/budget-repository";
-import { formatAmount } from "../features/budget/money";
+import { useCurrency } from "../features/budget/CurrencyProvider";
 import { commitmentsUntilPayday } from "../features/budget/projection";
 import {
   getRecommendations,
@@ -28,6 +28,7 @@ function parseNonNegative(value: string) {
 
 export function HomePage() {
   const { user } = useAuth();
+  const { budgetCurrency, formatAmount } = useCurrency();
   const [income, setIncome] = useState("");
   const [reserve, setReserve] = useState("");
   const [paydayDay, setPaydayDay] = useState("1");
@@ -64,6 +65,7 @@ export function HomePage() {
             getRecommendations(
               nextSummary,
               commitmentsUntilPayday(commitments, settings.payday_day),
+              formatAmount,
             ),
           );
         }
@@ -121,6 +123,7 @@ export function HomePage() {
         getRecommendations(
           nextSummary,
           commitmentsUntilPayday(commitments, payday),
+          formatAmount,
         ),
       );
     } catch (saveError) {
@@ -151,7 +154,7 @@ export function HomePage() {
         <>
           <form className="budget-settings" onSubmit={saveSettings}>
             <div>
-              <label htmlFor="monthly-income">Revenu mensuel net</label>
+              <label htmlFor="monthly-income">Revenu mensuel net ({budgetCurrency})</label>
               <input
                 id="monthly-income"
                 inputMode="decimal"
@@ -162,7 +165,7 @@ export function HomePage() {
               />
             </div>
             <div>
-              <label htmlFor="reserve-amount">Reserve a conserver</label>
+              <label htmlFor="reserve-amount">Reserve a conserver ({budgetCurrency})</label>
               <input
                 id="reserve-amount"
                 inputMode="decimal"

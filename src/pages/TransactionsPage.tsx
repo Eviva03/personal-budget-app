@@ -8,7 +8,7 @@ import {
   listTransactions,
   updateTransaction,
 } from "../features/budget/budget-repository";
-import { formatAmount } from "../features/budget/money";
+import { useCurrency } from "../features/budget/CurrencyProvider";
 import { TransactionImport } from "../features/budget/TransactionImport";
 import { transactionsToCsv } from "../features/budget/transaction-export";
 import type {
@@ -34,6 +34,7 @@ function CategoryBadge({ category }: { category?: Category }) {
 
 export function TransactionsPage() {
   const { user } = useAuth();
+  const { budgetCurrency, formatAmount } = useCurrency();
   const [items, setItems] = useState<Transaction[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [error, setError] = useState("");
@@ -317,7 +318,7 @@ export function TransactionsPage() {
                 }
                 maxLength={200}
               />
-              <label htmlFor="edit-amount">Montant</label>
+              <label htmlFor="edit-amount">Montant ({budgetCurrency})</label>
               <input
                 id="edit-amount"
                 type="number"

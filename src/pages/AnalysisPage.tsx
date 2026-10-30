@@ -14,7 +14,7 @@ import {
   listCommitments,
   listTransactions,
 } from "../features/budget/budget-repository";
-import { formatAmount } from "../features/budget/money";
+import { useCurrency } from "../features/budget/CurrencyProvider";
 import {
   commitmentsUntilPayday,
   nextPayday,
@@ -34,6 +34,7 @@ type AnalysisInsight = {
 
 export function AnalysisPage() {
   const { user } = useAuth();
+  const { formatAmount } = useCurrency();
   const [upcoming, setUpcoming] = useState<UpcomingCommitment[]>([]);
   const [spending, setSpending] = useState<SpendingPoint[]>([]);
   const [payday, setPayday] = useState<Date | null>(null);

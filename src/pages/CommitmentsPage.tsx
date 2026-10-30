@@ -5,7 +5,7 @@ import { isCommitmentFinished } from '../features/budget/budget-engine'
 import { CategoryIcon } from '../features/budget/category-icon'
 import { CommitmentImport } from '../features/budget/CommitmentImport'
 import { deleteCommitment, listCategories, listCommitments, updateCommitment } from '../features/budget/budget-repository'
-import { formatAmount } from '../features/budget/money'
+import { useCurrency } from '../features/budget/CurrencyProvider'
 import type { Category, Commitment, NewCommitment } from '../features/budget/types'
 import './pages.css'
 
@@ -21,6 +21,7 @@ function installmentLabel(item: Commitment) {
 
 export function CommitmentsPage() {
   const { user } = useAuth()
+  const { formatAmount } = useCurrency()
   const [items, setItems] = useState<Commitment[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [editing, setEditing] = useState<Commitment | null>(null)

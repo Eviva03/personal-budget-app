@@ -9,5 +9,5 @@ const upcoming: UpcomingCommitment = { id: 'c', user_id: 'u', category_id: null,
 describe('getRecommendations', () => {
   it('alerts when the projected free remainder is negative', () => expect(getRecommendations(summary(-20), []).at(0)?.level).toBe('alert'))
   it('warns when the reserve is not fully covered', () => expect(getRecommendations(summary(40, 100, 200), []).at(0)?.title).toBe('Reserve exposee'))
-  it('explains upcoming payment exposure', () => expect(getRecommendations(summary(300), [upcoming]).at(1)?.message).toContain('24.00 EUR'))
+  it('explains upcoming payment exposure', () => expect(getRecommendations(summary(300), [upcoming]).at(1)?.message).toContain('24,00 €'))
 })

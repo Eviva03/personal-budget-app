@@ -21,7 +21,9 @@ create table public.budget_settings (
   monthly_income numeric(12, 2) not null default 0 check (monthly_income >= 0),
   reserve_amount numeric(12, 2) not null default 0 check (reserve_amount >= 0),
   updated_at timestamptz not null default now(),
-  payday_day smallint not null default 1 check (payday_day between 1 and 28)
+  payday_day smallint not null default 1 check (payday_day between 1 and 28),
+  budget_currency text not null default 'EUR' check (budget_currency in ('EUR', 'XAF')),
+  display_currency text not null default 'EUR' check (display_currency in ('EUR', 'XAF'))
 );
 
 create table public.categories (

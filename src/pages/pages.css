@@ -292,6 +292,41 @@ h1 {
   flex-wrap: wrap;
   gap: 10px;
 }
+.currency-settings {
+  display: grid;
+  max-width: 520px;
+  gap: 10px;
+  margin: 0 0 28px;
+  padding: 18px;
+  background: #fffdf8;
+  border: 1px solid #deded5;
+  border-radius: 8px;
+}
+.currency-settings h2 {
+  margin: 0 0 4px;
+  color: #18382e;
+  font-family: Fraunces, serif;
+  font-size: 24px;
+}
+.currency-settings label {
+  color: #18382e;
+  font-size: 14px;
+  font-weight: 700;
+}
+.currency-settings select {
+  width: 100%;
+  padding: 11px 12px;
+  color: #18382e;
+  background: #fff;
+  border: 1px solid #bec7be;
+  border-radius: 6px;
+}
+.currency-settings p {
+  margin: 0 0 4px;
+  color: #526359;
+  font-size: 13px;
+  line-height: 1.45;
+}
 .profile-actions .primary-button {
   display: inline-flex;
   align-items: center;

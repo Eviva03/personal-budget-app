@@ -1,3 +1,5 @@
+import type { BudgetCurrency } from './money'
+
 export type CategoryType = 'income' | 'expense'
 export type CategoryIconName = 'banknote' | 'bus' | 'credit-card' | 'dumbbell' | 'house' | 'shopping-bag' | 'smartphone' | 'tag' | 'utensils'
 export type CommitmentFrequency = 'once' | 'weekly' | 'monthly' | 'yearly'
@@ -46,5 +48,7 @@ export type BudgetSettings = {
   monthly_income: number
   reserve_amount: number
   payday_day: number
+  budget_currency: BudgetCurrency
+  display_currency: BudgetCurrency
   updated_at: string
 }

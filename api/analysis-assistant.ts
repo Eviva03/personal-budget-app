@@ -99,7 +99,7 @@ export default async function handler(request: ApiRequest, response: ApiResponse
   const today = new Date()
   const monthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1)
   const [{ data: settings, error: settingsError }, { data: categories, error: categoriesError }, { data: transactions, error: transactionsError }, { data: commitments, error: commitmentsError }] = await Promise.all([
-    neon.from('budget_settings').select('monthly_income, reserve_amount, payday_day').maybeSingle(),
+    neon.from('budget_settings').select('monthly_income, reserve_amount, payday_day, budget_currency').maybeSingle(),
     neon.from('categories').select('id, name, type'),
     neon.from('transactions').select('amount, occurred_at, category_id').gte('occurred_at', isoDate(monthStart)),
     neon.from('commitments').select('amount, description, due_date, frequency, status'),
@@ -138,12 +138,12 @@ export default async function handler(request: ApiRequest, response: ApiResponse
   }).sort((left, right) => left.dueDate.localeCompare(right.dueDate)).slice(0, 8)
   const daysUntilPayday = Math.max(0, Math.ceil((payday.getTime() - today.getTime()) / 86_400_000))
   const snapshot = {
-    today: isoDate(today), daysUntilPayday, monthlyIncome: settings.monthly_income, reserve: settings.reserve_amount,
+    today: isoDate(today), currency: settings.budget_currency ?? 'EUR', daysUntilPayday, monthlyIncome: settings.monthly_income, reserve: settings.reserve_amount,
     currentMonthExpenses: rounded(currentExpenses.reduce((sum, transaction) => sum + transaction.amount, 0)),
     currentMonthIncome: rounded(currentIncome.reduce((sum, transaction) => sum + transaction.amount, 0)),
     upcomingCommitments: upcoming, categorySpending,
   }
-  const prompt = `Tu es un assistant d analyse de budget personnel en francais. Base-toi exclusivement sur le resume chiffre fourni. Ne crees et ne modifies jamais de donnees. Ne donne pas de conseil financier professionnel, seulement des pistes budgetaires prudentes. Reponds uniquement en JSON sans markdown: {"summary":"phrase factuelle moins de 420 caracteres","risks":["maximum 3 risques concrets"],"anomalies":["maximum 3 depenses ou categories inhabituelles, tableau vide si aucune"],"recommendations":["maximum 3 actions concretes et non prescriptives"]}. Ne pretend pas connaitre une information absente. Resume: ${JSON.stringify(snapshot)}`
+  const prompt = `Tu es un assistant d analyse de budget personnel en francais. Base-toi exclusivement sur le resume chiffre fourni. Tous les montants sont dans la devise indiquee par le champ currency; cite cette devise si tu mentionnes un montant. Ne crees et ne modifies jamais de donnees. Ne donne pas de conseil financier professionnel, seulement des pistes budgetaires prudentes. Reponds uniquement en JSON sans markdown: {"summary":"phrase factuelle moins de 420 caracteres","risks":["maximum 3 risques concrets"],"anomalies":["maximum 3 depenses ou categories inhabituelles, tableau vide si aucune"],"recommendations":["maximum 3 actions concretes et non prescriptives"]}. Ne pretend pas connaitre une information absente. Resume: ${JSON.stringify(snapshot)}`
   try {
     const models = [...new Set([geminiModel, 'gemini-3.1-flash-lite'])]
     const geminiResponse = await generateAnalysis(models, geminiKey, JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: 'application/json', temperature: 0.1, maxOutputTokens: 700 } }))

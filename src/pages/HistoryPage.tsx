@@ -2,11 +2,12 @@ import { useEffect, useState } from 'react'
 import { useAuth } from '../features/auth/useAuth'
 import { budgetHistory, type MonthlyBudgetHistory } from '../features/budget/budget-history'
 import { getBudgetSettings, listCommitments, listTransactions } from '../features/budget/budget-repository'
-import { formatAmount } from '../features/budget/money'
+import { useCurrency } from '../features/budget/CurrencyProvider'
 import './pages.css'
 
 export function HistoryPage() {
   const { user } = useAuth()
+  const { formatAmount } = useCurrency()
   const [history, setHistory] = useState<MonthlyBudgetHistory[]>([])
   const [error, setError] = useState('')
   useEffect(() => { if (!user) return; void Promise.all([getBudgetSettings(user.id), listTransactions(user.id), listCommitments(user.id)]).then(([settings, transactions, commitments]) => { if (settings) setHistory(budgetHistory(settings, transactions, commitments)) }).catch((requestError: unknown) => setError(requestError instanceof Error ? requestError.message : 'Impossible de charger l historique.')) }, [user])

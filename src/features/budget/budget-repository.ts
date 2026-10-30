@@ -95,7 +95,7 @@ export async function getBudgetSettings(userId: string) {
   return data as BudgetSettings | null
 }
 
-export async function saveBudgetSettings(userId: string, settings: Pick<BudgetSettings, 'monthly_income' | 'reserve_amount' | 'payday_day'>) {
+export async function saveBudgetSettings(userId: string, settings: Pick<BudgetSettings, 'monthly_income' | 'reserve_amount' | 'payday_day'> & Partial<Pick<BudgetSettings, 'budget_currency' | 'display_currency'>>) {
   const { data, error } = await client().from('budget_settings').upsert({ user_id: userId, ...settings, updated_at: new Date().toISOString() }).select().single()
   if (error) throw error
   return data as BudgetSettings
