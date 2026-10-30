@@ -6,8 +6,10 @@ import { getBudgetSettings, listCategories, listCommitments, listTransactions } 
 import './pages.css'
 
 export function ProfilePage() {
-	const { configured, loading, user, signIn, signOut } = useAuth()
+	const { configured, loading, user, signIn, signOut, verifyCode } = useAuth()
 	const [email, setEmail] = useState('')
+	const [code, setCode] = useState('')
+	const [codeRequested, setCodeRequested] = useState(false)
 	const [message, setMessage] = useState('')
 	const [submitting, setSubmitting] = useState(false)
 	const [exporting, setExporting] = useState(false)
@@ -19,7 +21,17 @@ export function ProfilePage() {
 		setMessage('')
 		const result = await signIn(email)
 		const isRateLimited = result.error?.toLowerCase().includes('rate limit')
-		setMessage(isRateLimited ? 'Trop de liens ont ete demandes. Attendez environ une heure avant de reessayer.' : result.error ?? 'Un lien de connexion vient de vous etre envoye.')
+		if (!result.error) setCodeRequested(true)
+		setMessage(isRateLimited ? 'Trop de codes ont ete demandes. Attendez environ une heure avant de reessayer.' : result.error ?? 'Un code de connexion vient de vous etre envoye.')
+		setSubmitting(false)
+	}
+
+	async function handleCodeSubmit(event: FormEvent<HTMLFormElement>) {
+		event.preventDefault()
+		setSubmitting(true)
+		setMessage('')
+		const result = await verifyCode(email, code.trim())
+		setMessage(result.error ?? 'Connexion validee.')
 		setSubmitting(false)
 	}
 
@@ -39,5 +51,5 @@ export function ProfilePage() {
 		return <section className="page-placeholder"><p className="eyebrow">ESPACE PERSONNEL</p><h1>Vous etes connecte.</h1><p className="description">{user.email}</p><div className="profile-actions"><button className="primary-button" type="button" onClick={() => void downloadBackup()} disabled={exporting}><Download size={18} />{exporting ? 'Preparation...' : 'Telecharger ma sauvegarde'}</button><button className="secondary-button" type="button" onClick={() => void signOut()}>Se deconnecter</button></div>{exportError && <p className="form-message" role="alert">{exportError}</p>}</section>
 	}
 
-	return <section className="page-placeholder"><p className="eyebrow">ESPACE PERSONNEL</p><h1>Bienvenue.</h1><p className="description">Entrez votre adresse e-mail pour recevoir un lien de connexion securise.</p><form className="auth-form" onSubmit={handleSubmit}><label htmlFor="email">Adresse e-mail</label><input id="email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} required autoComplete="email" placeholder="vous@exemple.fr" /><button className="primary-button" type="submit" disabled={submitting}>{submitting ? 'Envoi...' : 'Recevoir un lien'}</button>{message && <p className="form-message" role="status">{message}</p>}</form></section>
+	return <section className="page-placeholder"><p className="eyebrow">ESPACE PERSONNEL</p><h1>Bienvenue.</h1><p className="description">{codeRequested ? 'Saisissez le code recu par e-mail pour ouvrir votre espace.' : 'Entrez votre adresse e-mail pour recevoir un code de connexion securise.'}</p>{codeRequested ? <form className="auth-form" onSubmit={handleCodeSubmit}><label htmlFor="verification-code">Code de connexion</label><input id="verification-code" inputMode="numeric" value={code} onChange={(event) => setCode(event.target.value)} required autoComplete="one-time-code" placeholder="000000" /><button className="primary-button" type="submit" disabled={submitting}>{submitting ? 'Verification...' : 'Se connecter'}</button><button className="secondary-button" type="button" onClick={() => { setCodeRequested(false); setCode(''); setMessage('') }} disabled={submitting}>Utiliser une autre adresse</button>{message && <p className="form-message" role="status">{message}</p>}</form> : <form className="auth-form" onSubmit={handleSubmit}><label htmlFor="email">Adresse e-mail</label><input id="email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} required autoComplete="email" placeholder="vous@exemple.fr" /><button className="primary-button" type="submit" disabled={submitting}>{submitting ? 'Envoi...' : 'Recevoir un code'}</button>{message && <p className="form-message" role="status">{message}</p>}</form>}</section>
 }

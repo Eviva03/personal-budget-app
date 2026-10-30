@@ -10,6 +10,7 @@ export type AuthContextValue = {
   loading: boolean
   user: AuthUser | null
   signIn: (email: string) => Promise<{ error?: string }>
+  verifyCode: (email: string, code: string) => Promise<{ error?: string }>
   signOut: () => Promise<void>
 }
 

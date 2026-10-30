@@ -48,7 +48,7 @@ Les routes SPA sont couvertes en deploiement par `vercel.json`. Les variables fu
 VITE_NEON_URL=https://YOUR_NEON_HOST/your_database
 ```
 
-4. Dans la configuration Neon Auth, autorisez l'URL locale, par exemple `http://localhost:5173`, ainsi que l'URL de production Vercel pour les redirections Magic Link.
+4. Dans la configuration Neon Auth, autorisez l'URL locale, par exemple `http://localhost:5173`, ainsi que l'URL de production Vercel. Le fournisseur e-mail partage de Neon envoie des codes de connexion; un SMTP personnalise est necessaire pour les Magic Links.
 
 Ne placez jamais dans un fichier frontend un mot de passe de base de donnees, une cle secrete ou un secret JWT.
 

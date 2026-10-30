@@ -35,11 +35,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function signIn(email: string) {
     if (!neon) return { error: 'Neon n est pas configure.' }
-    const { error } = await neon.auth.signInWithOtp({ email, options: { emailRedirectTo: window.location.origin } })
+    const { error } = await neon.auth.signInWithOtp({ email })
+    return error ? { error: error.message } : {}
+  }
+
+  async function verifyCode(email: string, code: string) {
+    if (!neon) return { error: 'Neon n est pas configure.' }
+    const { error } = await neon.auth.verifyOtp({ email, token: code, type: 'email' })
     return error ? { error: error.message } : {}
   }
 
   async function signOut() { await neon?.auth.signOut() }
 
-  return <AuthContext value={{ configured: isNeonConfigured, loading, user, signIn, signOut }}>{children}</AuthContext>
+  return <AuthContext value={{ configured: isNeonConfigured, loading, user, signIn, verifyCode, signOut }}>{children}</AuthContext>
 }
