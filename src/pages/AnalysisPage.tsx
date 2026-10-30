@@ -199,8 +199,11 @@ export function AnalysisPage() {
           <section className="analysis-assistant" aria-live="polite">
             <div className="analysis-assistant-heading">
               <div>
-                <p className="panel-label">ANALYSE INTELLIGENTE</p>
-                <h2>Voir les points d attention.</h2>
+                <p className="panel-label">RESTE AVANT PAIE</p>
+                <h2>{formatAmount(availableUntilPayday)} disponible.</h2>
+                <p className="analysis-assistant-message">
+                  Apres {formatAmount(reserveAmount)} de reserve et {formatAmount(upcomingTotal)} d echeances prevues.
+                </p>
               </div>
               <button
                 className="secondary-button"
@@ -209,7 +212,7 @@ export function AnalysisPage() {
                 disabled={assistantLoading}
               >
                 <Sparkles size={17} aria-hidden="true" />
-                {assistantLoading ? "Analyse en cours..." : "Lancer l analyse"}
+                {assistantLoading ? "Analyse en cours..." : "Enrichir avec Gemini"}
               </button>
             </div>
             {assistantMessage && (
