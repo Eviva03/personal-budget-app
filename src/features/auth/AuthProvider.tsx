@@ -2,6 +2,10 @@ import { type ReactNode, useEffect, useState } from 'react'
 import { isNeonConfigured, neon } from '../../lib/neon'
 import { AuthContext, type AuthUser } from './auth-context'
 
+function toAuthUser(candidate: { id: string; email?: string | null } | null): AuthUser | null {
+  return candidate?.email ? { id: candidate.id, email: candidate.email } : null
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null)
   const [loading, setLoading] = useState(isNeonConfigured)
@@ -9,9 +13,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!neon) return
     const client = neon
-    function toAuthUser(candidate: { id: string; email?: string | null } | null): AuthUser | null {
-      return candidate?.email ? { id: candidate.id, email: candidate.email } : null
-    }
     async function restoreSession() {
       try {
         const { data } = await client.auth.getUser()
@@ -41,7 +42,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function verifyCode(email: string, code: string) {
     if (!neon) return { error: 'Neon n est pas configure.' }
-    const { error } = await neon.auth.verifyOtp({ email, token: code, type: 'email' })
+    const { data, error } = await neon.auth.verifyOtp({ email, token: code, type: 'email' })
+    const authenticatedUser = toAuthUser(data.user)
+    if (authenticatedUser) {
+      setUser(authenticatedUser)
+      void neon.rpc('claim_legacy_budget')
+    }
     return error ? { error: error.message } : {}
   }
 

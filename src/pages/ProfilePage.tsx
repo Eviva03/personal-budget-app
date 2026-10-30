@@ -1,5 +1,6 @@
 import { Download } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../features/auth/useAuth'
 import { createBudgetBackup } from '../features/budget/backup-export'
 import { getBudgetSettings, listCategories, listCommitments, listTransactions } from '../features/budget/budget-repository'
@@ -7,6 +8,8 @@ import './pages.css'
 
 export function ProfilePage() {
 	const { configured, loading, user, signIn, signOut, verifyCode } = useAuth()
+	const navigate = useNavigate()
+	const location = useLocation()
 	const [email, setEmail] = useState('')
 	const [code, setCode] = useState('')
 	const [codeRequested, setCodeRequested] = useState(false)
@@ -31,7 +34,8 @@ export function ProfilePage() {
 		setSubmitting(true)
 		setMessage('')
 		const result = await verifyCode(email, code.trim())
-		setMessage(result.error ?? 'Connexion validee.')
+		if (result.error) setMessage(result.error)
+		else navigate((location.state as { from?: { pathname?: string } } | null)?.from?.pathname ?? '/', { replace: true })
 		setSubmitting(false)
 	}
 
