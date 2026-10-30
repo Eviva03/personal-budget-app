@@ -33,7 +33,7 @@ function invoiceDescription(text: string) {
 
 export function analyzeDocumentText(text: string, transactions: NewTransaction[]): DocumentAnalysis {
   const compact = normalized(text)
-  if (transactions.length > 0 || /transactions du compte|solde d.?ouverture|argent sortant|argent entrant|releve/.test(compact)) {
+  if (transactions.length > 0 || /transactions du compte|solde d.?ouverture|argent sortant|argent entrant|releve|\bstatement\b|balance summary|opening balance|money out|money in|closing balance/.test(compact)) {
     return { kind: 'bank_statement', confidence: transactions.length > 0 ? 'high' : 'medium', explanation: transactions.length > 0 ? `${transactions.length} transaction(s) detectee(s) dans le releve.` : 'Le document ressemble a un releve bancaire.', invoice: null }
   }
 

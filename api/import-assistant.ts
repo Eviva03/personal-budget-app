@@ -11,6 +11,7 @@ type AssistantSuggestion = {
 }
 
 const maxLines = 10
+const fallbackModel = 'gemini-3.1-flash-lite'
 
 type ApiRequest = {
   method?: string
@@ -51,6 +52,23 @@ function suggestionsFrom(value: unknown, lines: ImportLine[], categories: Catego
   })
 }
 
+async function generateSuggestions(models: string[], apiKey: string, body: string) {
+  for (const model of models) {
+    try {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body,
+        signal: AbortSignal.timeout(15_000),
+      })
+      if (response.status !== 429 && response.status !== 503) return response
+    } catch {
+      // Try the fallback after a transient network failure or timeout.
+    }
+  }
+  throw new Error('Gemini is unavailable')
+}
+
 export default async function handler(request: ApiRequest, response: ApiResponse) {
   if (request.method !== 'POST') return send(response, { error: 'Method not allowed.' }, 405)
 
@@ -74,11 +92,7 @@ export default async function handler(request: ApiRequest, response: ApiResponse
 
   const prompt = `Tu classes des lignes de budget francaises. Propose uniquement une categorie existante, sans creer ni modifier de transaction. Reponds avec un tableau JSON sans markdown: [{"id":"...","categoryId":"... ou null","confidence":"low|medium|high","explanation":"moins de 240 caracteres"}]. Categories: ${JSON.stringify(payload.categories)}. Lignes ambiguës: ${JSON.stringify(payload.lines)}`
   try {
-    const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(geminiModel)}:generateContent?key=${encodeURIComponent(geminiKey)}`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: 'application/json', temperature: 0.1, maxOutputTokens: 1200 } }),
-    })
+    const geminiResponse = await generateSuggestions([...new Set([geminiModel, fallbackModel])], geminiKey, JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: 'application/json', temperature: 0.1, maxOutputTokens: 1200 } }))
     if (!geminiResponse.ok) return send(response, { error: 'L assistant ne peut pas traiter cette demande.' }, 502)
     const responseBody = await geminiResponse.json() as { candidates?: { content?: { parts?: { text?: string }[] } }[] }
     const text = responseBody.candidates?.[0]?.content?.parts?.[0]?.text

@@ -14,6 +14,7 @@ type DocumentProposal = {
 }
 type ApiRequest = { method?: string; headers: { authorization?: string | string[] | undefined }; body?: unknown }
 type ApiResponse = { status: (status: number) => ApiResponse; json: (body: unknown) => void }
+const fallbackModel = 'gemini-3.1-flash-lite'
 
 function send(response: ApiResponse, body: unknown, status = 200) {
   response.status(status).json(body)
@@ -32,6 +33,23 @@ function proposalFrom(value: unknown, categories: CategoryInput[]): DocumentProp
   const categoryIds = new Set(categories.map((category) => category.id))
   if ((kind !== 'bank_statement' && kind !== 'invoice' && kind !== 'receipt' && kind !== 'unknown') || typeof proposal.description !== 'string' || proposal.description.length > 200 || (proposal.amount !== null && (typeof proposal.amount !== 'number' || !Number.isFinite(proposal.amount) || proposal.amount < 0)) || (proposal.dueDate !== null && (typeof proposal.dueDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(proposal.dueDate))) || (proposal.categoryId !== null && (typeof proposal.categoryId !== 'string' || !categoryIds.has(proposal.categoryId))) || (proposal.confidence !== 'low' && proposal.confidence !== 'medium' && proposal.confidence !== 'high') || typeof proposal.explanation !== 'string' || proposal.explanation.length > 240) return null
   return { kind, description: proposal.description, amount: proposal.amount ?? null, dueDate: proposal.dueDate ?? null, categoryId: proposal.categoryId ?? null, confidence: proposal.confidence, explanation: proposal.explanation }
+}
+
+async function generateDocumentAnalysis(models: string[], apiKey: string, body: string) {
+  for (const model of models) {
+    try {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body,
+        signal: AbortSignal.timeout(15_000),
+      })
+      if (response.status !== 429 && response.status !== 503) return response
+    } catch {
+      // Try the fallback after a transient network failure or timeout.
+    }
+  }
+  throw new Error('Gemini is unavailable')
 }
 
 export default async function handler(request: ApiRequest, response: ApiResponse) {
@@ -53,7 +71,7 @@ export default async function handler(request: ApiRequest, response: ApiResponse
 
   const prompt = `Tu analyses des documents financiers personnels en francais. Ne crees et ne modifies jamais de donnees. Identifie le type: bank_statement, invoice, receipt ou unknown. Pour une facture ou un ticket, extrais seulement un fournisseur ou libelle, total, echeance ISO si explicite, et une categorie existante. Reponds uniquement en JSON sans markdown: {"kind":"bank_statement|invoice|receipt|unknown","description":"...","amount":number|null,"dueDate":"YYYY-MM-DD"|null,"categoryId":"..."|null,"confidence":"low|medium|high","explanation":"moins de 240 caracteres"}. Categories: ${JSON.stringify(request.body.categories)}. Texte extrait: ${request.body.text}`
   try {
-    const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(geminiModel)}:generateContent?key=${encodeURIComponent(geminiKey)}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: 'application/json', temperature: 0.1, maxOutputTokens: 700 } }) })
+    const geminiResponse = await generateDocumentAnalysis([...new Set([geminiModel, fallbackModel])], geminiKey, JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: 'application/json', temperature: 0.1, maxOutputTokens: 700 } }))
     if (!geminiResponse.ok) return send(response, { error: 'L assistant ne peut pas traiter ce document.' }, 502)
     const body = await geminiResponse.json() as { candidates?: { content?: { parts?: { text?: string }[] } }[] }
     const text = body.candidates?.[0]?.content?.parts?.[0]?.text
