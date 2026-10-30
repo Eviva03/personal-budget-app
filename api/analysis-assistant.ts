@@ -77,7 +77,7 @@ async function generateAnalysis(models: string[], apiKey: string, body: string) 
       lastError = error
       continue
     }
-    if (geminiResponse.status !== 503) return geminiResponse
+    if (geminiResponse.status !== 429 && geminiResponse.status !== 503) return geminiResponse
   }
   if (!geminiResponse) throw lastError ?? new Error('Gemini did not return a response.')
   return geminiResponse
