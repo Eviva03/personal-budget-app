@@ -165,7 +165,7 @@ security definer
 set search_path = public
 as $$
 declare
-  current_period date := date_trunc('month', current_date)::date;
+  current_period date := current_date;
   next_count integer;
   next_cost numeric(6, 3);
   current_user_id uuid := auth.user_id();
@@ -178,7 +178,7 @@ begin
   values (current_period, 0.010)
   on conflict (period_start) do update
     set estimated_cost_eur = public.ai_import_global_usage.estimated_cost_eur + 0.010
-    where public.ai_import_global_usage.estimated_cost_eur + 0.010 <= 5.000
+    where public.ai_import_global_usage.estimated_cost_eur + 0.010 <= 0.200
   returning estimated_cost_eur into next_cost;
 
   if next_cost is null then
