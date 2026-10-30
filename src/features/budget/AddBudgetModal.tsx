@@ -6,7 +6,7 @@ import type { Category } from './types'
 
 type AddBudgetModalProps = { userId: string; onClose: () => void; onCreated: () => void }
 type EntryType = 'transaction' | 'commitment'
-type SupabaseError = { message?: unknown; details?: unknown; hint?: unknown; code?: unknown }
+type DatabaseError = { message?: unknown; details?: unknown; hint?: unknown; code?: unknown }
 
 const today = new Date().toISOString().slice(0, 10)
 
@@ -34,8 +34,8 @@ export function AddBudgetModal({ userId, onClose, onCreated }: AddBudgetModalPro
       else await createCommitment(userId, { amount: parsedAmount, description, due_date: date, frequency: frequency as 'once' | 'weekly' | 'monthly' | 'yearly', installment_count: frequency === 'monthly' && installmentCount ? Number(installmentCount) : null, category_id: categoryId || null })
       onCreated(); onClose()
     } catch (requestError) {
-      const supabaseError = requestError as SupabaseError
-      const detail = [supabaseError.message, supabaseError.details, supabaseError.hint]
+      const databaseError = requestError as DatabaseError
+      const detail = [databaseError.message, databaseError.details, databaseError.hint]
         .filter((value): value is string => typeof value === 'string' && value.length > 0)
         .join(' ')
       setError(detail || 'Impossible d enregistrer cette donnee.')

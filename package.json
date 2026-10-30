@@ -11,7 +11,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.118.0",
+    "@neondatabase/neon-js": "^0.9.0-beta",
     "lucide-react": "^1.62.0",
     "papaparse": "^5.7.0",
     "pdfjs-dist": "^6.4.299",

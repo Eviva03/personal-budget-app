@@ -1,9 +1,9 @@
-import { supabase } from '../../lib/supabase'
+import { neon } from '../../lib/neon'
 import type { BudgetSettings, Category, CategoryType, Commitment, NewCommitment, NewTransaction, Transaction } from './types'
 
 function client() {
-  if (!supabase) throw new Error('Supabase n est pas configure.')
-  return supabase
+  if (!neon) throw new Error('Neon n est pas configure.')
+  return neon
 }
 
 export async function listCategories(userId: string) {

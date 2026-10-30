@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js'
+import { createAuthenticatedNeonClient, hasAuthenticatedUser } from '../server/neon'
 
 type CategoryInput = { id: string; name: string; type: 'income' | 'expense' }
 type ImportLine = { id: string; description: string; amount: number; occurredAt: string }
@@ -54,23 +54,21 @@ function suggestionsFrom(value: unknown, lines: ImportLine[], categories: Catego
 export default async function handler(request: ApiRequest, response: ApiResponse) {
   if (request.method !== 'POST') return send(response, { error: 'Method not allowed.' }, 405)
 
-  const supabaseUrl = process.env.SUPABASE_URL
-  const supabaseKey = process.env.SUPABASE_PUBLISHABLE_KEY
   const geminiKey = process.env.GEMINI_API_KEY
   const geminiModel = process.env.GEMINI_MODEL
   const authorization = request.headers.authorization
   const token = (Array.isArray(authorization) ? authorization[0] : authorization)?.replace(/^Bearer\s+/i, '')
-  if (!supabaseUrl || !supabaseKey || !geminiKey || !geminiModel) return send(response, { error: 'L assistant n est pas configure.' }, 503)
+  if (!geminiKey || !geminiModel) return send(response, { error: 'L assistant n est pas configure.' }, 503)
   if (!token) return send(response, { error: 'Authentification requise.' }, 401)
 
   const payload = request.body
   if (!isRequest(payload)) return send(response, { error: 'Envoyez entre une et dix lignes avec leurs categories.' }, 400)
 
-  const supabase = createClient(supabaseUrl, supabaseKey, { global: { headers: { Authorization: `Bearer ${token}` } } })
-  const { data: userData, error: userError } = await supabase.auth.getUser(token)
-  if (userError || !userData.user) return send(response, { error: 'Session invalide.' }, 401)
+  const neon = createAuthenticatedNeonClient(token)
+  if (!neon) return send(response, { error: 'L assistant n est pas configure.' }, 503)
+  if (!await hasAuthenticatedUser(neon)) return send(response, { error: 'Session invalide.' }, 401)
 
-  const { data: allowance, error: allowanceError } = await supabase.rpc('consume_ai_import_quota')
+  const { data: allowance, error: allowanceError } = await neon.rpc('consume_ai_import_quota')
   if (allowanceError) return send(response, { error: 'Impossible de verifier le quota assistant.' }, 500)
   if (!allowance?.allowed) return send(response, { error: allowance?.reason === 'global_limit' ? 'Le budget mensuel de l assistant est atteint.' : 'Votre quota mensuel assistant est atteint.' }, 429)
 

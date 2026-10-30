@@ -5,6 +5,7 @@ import { AppLayout } from './components/AppLayout'
 import { ProtectedRoute } from './features/auth/ProtectedRoute'
 import { useAuth } from './features/auth/useAuth'
 import { AddBudgetModal } from './features/budget/AddBudgetModal'
+import { PwaInstallPrompt } from './components/PwaInstallPrompt'
 import { AnalysisPage } from './pages/AnalysisPage'
 import { CommitmentsPage } from './pages/CommitmentsPage'
 import { HomePage } from './pages/HomePage'
@@ -37,6 +38,7 @@ function App() {
         <Plus size={24} strokeWidth={2.5} aria-hidden="true" />
       </button>}
       {user && isAdding && <AddBudgetModal userId={user.id} onClose={() => setIsAdding(false)} onCreated={() => window.dispatchEvent(new Event('budget-data-changed'))} />}
+      <PwaInstallPrompt />
     </AppLayout>
   )
 }

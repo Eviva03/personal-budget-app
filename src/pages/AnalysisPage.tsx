@@ -21,7 +21,7 @@ import {
   type SpendingPoint,
   type UpcomingCommitment,
 } from "../features/budget/projection";
-import { supabase } from "../lib/supabase";
+import { neon } from "../lib/neon";
 import "./pages.css";
 
 type AnalysisInsight = {
@@ -96,11 +96,11 @@ export function AnalysisPage() {
     void load();
   }, [user]);
   async function runAnalysisAssistant() {
-    if (!supabase) {
-      setAssistantMessage("L assistant demande une session Supabase configuree.");
+    if (!neon) {
+      setAssistantMessage("L assistant demande une session Neon configuree.");
       return;
     }
-    const { data: sessionData } = await supabase.auth.getSession();
+    const { data: sessionData } = await neon.auth.getSession();
     if (!sessionData.session) {
       setAssistantMessage("Connectez-vous avant d utiliser l assistant.");
       return;

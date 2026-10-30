@@ -30,7 +30,7 @@ export function ProfilePage() {
 	}
 
 	if (!configured) {
-		return <section className="page-placeholder"><p className="eyebrow">CONFIGURATION</p><h1>Connectez Supabase.</h1><p className="description">Ajoutez les deux variables publiques dans votre fichier <code>.env.local</code> pour activer la connexion.</p><div className="placeholder-card"><span className="status-dot" aria-hidden="true" /><p>VITE_SUPABASE_URL et VITE_SUPABASE_PUBLISHABLE_KEY sont necessaires.</p></div></section>
+		return <section className="page-placeholder"><p className="eyebrow">CONFIGURATION</p><h1>Connectez Neon.</h1><p className="description">Ajoutez l URL publique Neon dans votre fichier <code>.env.local</code> pour activer la connexion.</p><div className="placeholder-card"><span className="status-dot" aria-hidden="true" /><p>VITE_NEON_URL est necessaire.</p></div></section>
 	}
 
 	if (loading) return <section className="page-placeholder"><p className="eyebrow">ESPACE PERSONNEL</p><h1>Chargement...</h1></section>

@@ -26,7 +26,7 @@ import type {
   NewTransaction,
   Transaction,
 } from "./types";
-import { supabase } from "../../lib/supabase";
+import { neon } from "../../lib/neon";
 
 type TransactionImportProps = { userId: string; onImported: () => void };
 type AssistantSuggestion = {
@@ -185,8 +185,8 @@ export function TransactionImport({
     return "Document a verifier";
   }
   async function improveWithAssistant() {
-    if (!preview || !supabase) {
-      setMessage("L assistant demande une session Supabase configuree.");
+    if (!preview || !neon) {
+      setMessage("L assistant demande une session Neon configuree.");
       return;
     }
     const lines = preview.valid
@@ -201,7 +201,7 @@ export function TransactionImport({
       setMessage("Les lignes importees ont deja des suggestions locales fiables.");
       return;
     }
-    const { data: sessionData } = await supabase.auth.getSession();
+    const { data: sessionData } = await neon.auth.getSession();
     if (!sessionData.session) {
       setMessage("Connectez-vous avant d utiliser l assistant.");
       return;
@@ -247,11 +247,11 @@ export function TransactionImport({
     }
   }
   async function analyzeDocumentWithAssistant() {
-    if (!preview?.pdfText || !supabase) {
+    if (!preview?.pdfText || !neon) {
       setMessage("Choisissez un document lisible et connectez-vous avant cette analyse.");
       return;
     }
-    const { data: sessionData } = await supabase.auth.getSession();
+    const { data: sessionData } = await neon.auth.getSession();
     if (!sessionData.session) {
       setMessage("Connectez-vous avant d utiliser l assistant.");
       return;

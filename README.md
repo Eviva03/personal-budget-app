@@ -38,26 +38,19 @@ src/
 
 Les routes SPA sont couvertes en deploiement par `vercel.json`. Les variables futures destinees au navigateur sont documentees dans `.env.example`.
 
-## Supabase Setup
+## Neon Setup
 
-1. Creez un projet dans le [dashboard Supabase](https://supabase.com/dashboard).
-2. Dans **Project Settings > API**, copiez `Project URL` et la cle `Publishable`.
+1. Creez un projet dans le [dashboard Neon](https://console.neon.tech), puis activez **Data API** et **Neon Auth**.
+2. Appliquez `neon/migrations/20261030000000_create_budget_schema.sql` sur la branche cible.
 3. Creez `.env.local` a partir de `.env.example`, puis renseignez uniquement :
 
 ```bash
-VITE_SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
-VITE_SUPABASE_PUBLISHABLE_KEY=YOUR_SUPABASE_PUBLISHABLE_KEY
+VITE_NEON_URL=https://YOUR_NEON_HOST/your_database
 ```
 
-4. Dans **SQL Editor**, executez le contenu de `supabase/migrations/20261027000000_create_profiles.sql`.
-  Executez ensuite `supabase/migrations/20261027010000_create_budget_data.sql` pour creer les donnees budget et leurs policies RLS.
-  Enfin, executez `supabase/migrations/20261027020000_grant_budget_api_access.sql` pour accorder les privileges SQL necessaires au role authentifie.
-  Executez `supabase/migrations/20261027030000_create_budget_settings.sql` pour enregistrer le revenu mensuel et la reserve de chaque utilisateur.
-  Executez `supabase/migrations/20261027040000_add_payday_to_budget_settings.sql` pour activer la timeline jusqu a la prochaine paie.
-5. Dans **Authentication > URL Configuration**, ajoutez votre URL locale, par exemple `http://localhost:5173`, a **Redirect URLs**. Ajoutez egalement l'URL de production Vercel apres le premier deploiement.
-6. Dans **Authentication > Providers > Email**, activez Email et Magic Link.
+4. Dans la configuration Neon Auth, autorisez l'URL locale, par exemple `http://localhost:5173`, ainsi que l'URL de production Vercel pour les redirections Magic Link.
 
-Ne placez jamais dans un fichier frontend un mot de passe de base de donnees, une `service_role key`, une cle secrete ou un secret JWT.
+Ne placez jamais dans un fichier frontend un mot de passe de base de donnees, une cle secrete ou un secret JWT.
 
 ## Import de documents
 
@@ -68,11 +61,11 @@ Ne placez jamais dans un fichier frontend un mot de passe de base de donnees, un
 
 ## Assistant Gemini optionnel
 
-L'assistant est appele uniquement depuis une fonction serveur et ne doit jamais recevoir une cle dans le navigateur. Avant de l'activer, executez la migration `supabase/migrations/20261028010000_create_ai_import_usage.sql`, puis ajoutez ces variables uniquement dans l'environnement Vercel:
+L'assistant est appele uniquement depuis une fonction serveur et ne doit jamais recevoir une cle dans le navigateur. La migration Neon cree ses tables de quota. Ajoutez ces variables dans l'environnement Vercel:
 
 ```bash
-SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
-SUPABASE_PUBLISHABLE_KEY=YOUR_SUPABASE_PUBLISHABLE_KEY
+VITE_NEON_URL=https://YOUR_NEON_HOST/your_database
+NEON_URL=https://YOUR_NEON_HOST/your_database
 GEMINI_API_KEY=YOUR_GEMINI_API_KEY
 GEMINI_MODEL=YOUR_APPROVED_GEMINI_FLASH_MODEL
 ```

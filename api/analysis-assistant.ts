@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js'
+import { createAuthenticatedNeonClient, hasAuthenticatedUser } from '../server/neon'
 
 type ApiRequest = { method?: string; headers: { authorization?: string | string[] | undefined } }
 type ApiResponse = { status: (status: number) => ApiResponse; json: (body: unknown) => void }
@@ -67,31 +67,29 @@ async function generateAnalysis(url: string, body: string) {
 
 export default async function handler(request: ApiRequest, response: ApiResponse) {
   if (request.method !== 'POST') return send(response, { error: 'Method not allowed.' }, 405)
-  const supabaseUrl = process.env.SUPABASE_URL
-  const supabaseKey = process.env.SUPABASE_PUBLISHABLE_KEY
   const geminiKey = process.env.GEMINI_API_KEY
   const geminiModel = process.env.GEMINI_MODEL
   const authorization = request.headers.authorization
   const token = (Array.isArray(authorization) ? authorization[0] : authorization)?.replace(/^Bearer\s+/i, '')
-  if (!supabaseUrl || !supabaseKey || !geminiKey || !geminiModel) return send(response, { error: 'L assistant n est pas configure.' }, 503)
+  if (!geminiKey || !geminiModel) return send(response, { error: 'L assistant n est pas configure.' }, 503)
   if (!token) return send(response, { error: 'Authentification requise.' }, 401)
 
-  const supabase = createClient(supabaseUrl, supabaseKey, { global: { headers: { Authorization: `Bearer ${token}` } } })
-  const { data: userData, error: userError } = await supabase.auth.getUser(token)
-  if (userError || !userData.user) return send(response, { error: 'Session invalide.' }, 401)
+  const neon = createAuthenticatedNeonClient(token)
+  if (!neon) return send(response, { error: 'L assistant n est pas configure.' }, 503)
+  if (!await hasAuthenticatedUser(neon)) return send(response, { error: 'Session invalide.' }, 401)
 
   const today = new Date()
   const monthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1)
   const [{ data: settings, error: settingsError }, { data: categories, error: categoriesError }, { data: transactions, error: transactionsError }, { data: commitments, error: commitmentsError }] = await Promise.all([
-    supabase.from('budget_settings').select('monthly_income, reserve_amount, payday_day').maybeSingle(),
-    supabase.from('categories').select('id, name, type'),
-    supabase.from('transactions').select('amount, occurred_at, category_id').gte('occurred_at', isoDate(monthStart)),
-    supabase.from('commitments').select('amount, description, due_date, frequency, status'),
+    neon.from('budget_settings').select('monthly_income, reserve_amount, payday_day').maybeSingle(),
+    neon.from('categories').select('id, name, type'),
+    neon.from('transactions').select('amount, occurred_at, category_id').gte('occurred_at', isoDate(monthStart)),
+    neon.from('commitments').select('amount, description, due_date, frequency, status'),
   ])
   if (settingsError || categoriesError || transactionsError || commitmentsError) return send(response, { error: 'Impossible de charger les donnees budgetaires.' }, 500)
   if (!settings) return send(response, { error: 'Configurez votre budget avant cette analyse.' }, 400)
 
-  const { data: allowance, error: allowanceError } = await supabase.rpc('consume_ai_import_quota')
+  const { data: allowance, error: allowanceError } = await neon.rpc('consume_ai_import_quota')
   if (allowanceError) return send(response, { error: 'Impossible de verifier le quota assistant.' }, 500)
   if (!allowance?.allowed) return send(response, { error: allowance?.reason === 'global_limit' ? 'Le budget mensuel de l assistant est atteint.' : 'Votre quota mensuel assistant est atteint.' }, 429)
 

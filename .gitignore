@@ -1,5 +1,6 @@
 # Logs
 logs
+*.backup
 *.log
 npm-debug.log*
 yarn-debug.log*
@@ -29,3 +30,6 @@ dist-ssr
 
 .vercel
 .env*
+!.env.example
+.agents/
+skills-lock.json

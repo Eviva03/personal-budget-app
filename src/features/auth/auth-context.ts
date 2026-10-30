@@ -1,10 +1,14 @@
-import type { User } from '@supabase/supabase-js'
 import { createContext } from 'react'
+
+export type AuthUser = {
+  id: string
+  email: string
+}
 
 export type AuthContextValue = {
   configured: boolean
   loading: boolean
-  user: User | null
+  user: AuthUser | null
   signIn: (email: string) => Promise<{ error?: string }>
   signOut: () => Promise<void>
 }
