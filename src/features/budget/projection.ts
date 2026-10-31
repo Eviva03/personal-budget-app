@@ -3,6 +3,7 @@ import { isCommitmentFinished } from './budget-engine'
 
 export type UpcomingCommitment = Commitment & { nextDueDate: string }
 export type SpendingPoint = { label: string; amount: number }
+export type PaydayForecast = { payday: Date; daysRemaining: number; dailyAllowance: number; upcomingCommitments: UpcomingCommitment[] }
 
 function localDate(value: string) { return new Date(`${value}T00:00:00`) }
 function dateKey(date: Date) { return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}` }
@@ -37,4 +38,11 @@ export function spendingByDay(transactions: Transaction[], referenceDate = new D
   const grouped = new Map<string, number>()
   transactions.filter((transaction) => { const date = localDate(transaction.occurred_at); return date.getFullYear() === year && date.getMonth() === month }).forEach((transaction) => grouped.set(transaction.occurred_at, (grouped.get(transaction.occurred_at) ?? 0) + transaction.amount))
   return [...grouped.entries()].sort(([left], [right]) => left.localeCompare(right)).map(([date, amount]) => ({ label: new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short' }).format(localDate(date)), amount }))
+}
+
+export function forecastUntilPayday(freeRemainder: number, commitments: Commitment[], paydayDay: number, referenceDate = new Date()): PaydayForecast {
+  const today = new Date(referenceDate.getFullYear(), referenceDate.getMonth(), referenceDate.getDate())
+  const payday = nextPayday(paydayDay, today)
+  const daysRemaining = Math.max(1, Math.round((payday.getTime() - today.getTime()) / 86_400_000))
+  return { payday, daysRemaining, dailyAllowance: Math.round(freeRemainder / daysRemaining * 100) / 100, upcomingCommitments: commitmentsUntilPayday(commitments, paydayDay, today) }
 }

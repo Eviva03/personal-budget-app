@@ -33,6 +33,15 @@ describe('parseTransactionsCsv', () => {
     ])
   })
 
+  it('detects transactions in a Revolut screenshot OCR', () => {
+    const preview = parseTransactionsPdfText('John Jarelle N Oct 6, 6:51 AM Completed -e30 Personal > Mariage de Chimène Oct 5, 6:59 PM Completed -€4 Bbv Les Cuves Oct 5, 6:59 PM Completed -€4')
+    expect(preview.valid).toEqual([
+      { occurred_at: '2026-10-06', description: 'John Jarelle N', amount: 30, category_id: null },
+      { occurred_at: '2026-10-05', description: 'Personal > Mariage de Chimène', amount: 4, category_id: null },
+      { occurred_at: '2026-10-05', description: 'Bbv Les Cuves', amount: 4, category_id: null },
+    ])
+  })
+
   it('normalizes labels when comparing import duplicates', () => {
     expect(transactionFingerprint({ occurred_at: '2026-06-11', description: 'THE  LINUX  FONDATION', amount: 24.5, category_id: null })).toBe(transactionFingerprint({ occurred_at: '2026-06-11', description: 'the linux fondation', amount: 24.5, category_id: null }))
   })

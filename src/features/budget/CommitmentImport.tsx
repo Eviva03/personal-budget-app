@@ -30,7 +30,7 @@ function parseCsv(csv: string): { valid: NewCommitment[]; errors: string[] } {
     const rawFrequency = valueFor(row, ['frequence', 'fréquence', 'frequency']).toLowerCase()
     const frequency: CommitmentFrequency = rawFrequency.includes('hebdo') ? 'weekly' : rawFrequency.includes('ann') ? 'yearly' : rawFrequency.includes('mens') ? 'monthly' : 'once'
     const installments = Number(valueFor(row, ['mensualites', 'mensualités', 'installments']))
-    if (!description || !dueDate || !amount) { errors.push(`Ligne ${index + 2}: date, libelle ou montant invalide.`); return }
+    if (!description || !dueDate || !amount) { errors.push(`Ligne ${index + 2} : date, libellé ou montant invalide.`); return }
     valid.push({ description, due_date: dueDate, amount, frequency, installment_count: frequency === 'monthly' && Number.isInteger(installments) && installments >= 2 ? installments : null, category_id: null })
   })
   if (result.errors.length > 0) errors.push('Le fichier CSV contient une structure invalide.')
@@ -51,7 +51,7 @@ export function CommitmentImport({ userId, onImported }: CommitmentImportProps) 
     const [content, availableCategories] = await Promise.all([file.text(), listCategories(userId)])
     const parsed = parseCsv(content)
     setCategories(availableCategories); setPreview(parsed.valid)
-    setMessage(parsed.errors.join(' ') || `${parsed.valid.length} engagement(s) detecte(s).`)
+    setMessage(parsed.errors.join(' ') || `${parsed.valid.length} engagement(s) détecté(s).`)
   }
 
   function updateRow(index: number, field: keyof NewCommitment, value: string) {
@@ -59,9 +59,9 @@ export function CommitmentImport({ userId, onImported }: CommitmentImportProps) 
   }
 
   async function importPreview() {
-    if (!preview.length || preview.some((item) => !item.description.trim() || !item.due_date || !item.amount || item.amount <= 0)) { setMessage('Corrigez les lignes incompletes avant import.'); return }
+    if (!preview.length || preview.some((item) => !item.description.trim() || !item.due_date || !item.amount || item.amount <= 0)) { setMessage('Corrigez les lignes incomplètes avant l’import.'); return }
     setSaving(true)
-    try { await createCommitments(userId, preview); onImported(); setMessage(`${preview.length} engagement(s) importe(s).`); setPreview([]) } catch (error) { setMessage(error instanceof Error ? error.message : 'Impossible d importer les engagements.') } finally { setSaving(false) }
+    try { await createCommitments(userId, preview); onImported(); setMessage(`${preview.length} engagement(s) importé(s).`); setPreview([]) } catch (error) { setMessage(error instanceof Error ? error.message : 'Impossible d’importer les engagements.') } finally { setSaving(false) }
   }
 
   return <section className="commitment-import"><button className="import-trigger" type="button" onClick={() => setOpen((current) => !current)}><Upload size={18} />Importer des engagements</button>{open && <div className="import-panel"><button className="close-import" type="button" onClick={() => setOpen(false)} aria-label="Fermer l import"><X size={18} /></button><label className="file-picker"><FileText size={19} /><span>Choisir un fichier CSV</span><input type="file" accept=".csv,text/csv" onChange={(event) => void selectFile(event)} /></label><p className="import-hint">Colonnes reconnues: date, libelle, montant, frequence et mensualites.</p>{message && <p className="import-result">{message}</p>}{preview.length > 0 && <><div className="commitment-import-preview">{preview.map((item, index) => <div className="commitment-import-row" key={`${index}-${item.description}`}><input aria-label={`Date ${index + 1}`} type="date" value={item.due_date} onChange={(event) => updateRow(index, 'due_date', event.target.value)} /><input aria-label={`Libelle ${index + 1}`} value={item.description} onChange={(event) => updateRow(index, 'description', event.target.value)} /><input aria-label={`Montant ${index + 1}`} type="number" min="0.01" step="0.01" value={item.amount} onChange={(event) => updateRow(index, 'amount', event.target.value)} /><select aria-label={`Frequence ${index + 1}`} value={item.frequency} onChange={(event) => updateRow(index, 'frequency', event.target.value)}>{frequencies.map((frequency) => <option key={frequency.value} value={frequency.value}>{frequency.label}</option>)}</select>{item.frequency === 'monthly' && <input aria-label={`Mensualites ${index + 1}`} type="number" min="2" placeholder="Mensualites" value={item.installment_count ?? ''} onChange={(event) => updateRow(index, 'installment_count', event.target.value)} />}<select aria-label={`Categorie ${index + 1}`} value={item.category_id ?? ''} onChange={(event) => updateRow(index, 'category_id', event.target.value)}><option value="">Sans categorie</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></div>)}</div><button className="primary-button" type="button" onClick={() => void importPreview()} disabled={saving}>{saving ? 'Import...' : `Importer ${preview.length} engagement(s)`}</button></>}</div>}</section>

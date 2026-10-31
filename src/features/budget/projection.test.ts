@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { commitmentsUntilPayday, nextPayday, spendingByDay } from './projection'
+import { commitmentsUntilPayday, forecastUntilPayday, nextPayday, spendingByDay } from './projection'
 import type { Commitment, Transaction } from './types'
 
 const commitment = (frequency: Commitment['frequency'], due_date: string): Commitment => ({ id: frequency, user_id: 'u', category_id: null, amount: 10, description: frequency, due_date, frequency, status: 'active', created_at: '' })
@@ -17,4 +17,10 @@ describe('projection helpers', () => {
     expect(commitmentsUntilPayday([phone], 28, new Date('2026-10-30'))).toEqual([])
   })
   it('groups current-month transactions by day', () => expect(spendingByDay([transaction(10, '2026-10-02'), transaction(5, '2026-10-02'), transaction(9, '2026-09-30')], new Date('2026-10-27'))).toEqual([{ label: '2 oct.', amount: 15 }]))
+  it('turns the commitment-adjusted free balance into a daily allowance', () => {
+    const forecast = forecastUntilPayday(90, [commitment('monthly', '2026-10-28')], 5, new Date('2026-10-27'))
+    expect(forecast.daysRemaining).toBe(9)
+    expect(forecast.dailyAllowance).toBe(10)
+    expect(forecast.upcomingCommitments).toHaveLength(1)
+  })
 })

@@ -7,12 +7,14 @@ import {
 } from "../features/budget/budget-engine";
 import {
   getBudgetSettings,
+  listCategories,
   listCommitments,
   listTransactions,
   saveBudgetSettings,
 } from "../features/budget/budget-repository";
 import { useCurrency } from "../features/budget/CurrencyProvider";
-import { commitmentsUntilPayday } from "../features/budget/projection";
+import { convertAmount } from "../features/budget/money";
+import { commitmentsUntilPayday, forecastUntilPayday, type PaydayForecast } from "../features/budget/projection";
 import {
   getRecommendations,
   type Recommendation,
@@ -28,11 +30,12 @@ function parseNonNegative(value: string) {
 
 export function HomePage() {
   const { user } = useAuth();
-  const { budgetCurrency, formatAmount } = useCurrency();
+  const { budgetCurrency, displayCurrency, formatAmount } = useCurrency();
   const [income, setIncome] = useState("");
   const [reserve, setReserve] = useState("");
   const [paydayDay, setPaydayDay] = useState("1");
   const [summary, setSummary] = useState<BudgetSummary | null>(null);
+  const [forecast, setForecast] = useState<PaydayForecast | null>(null);
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -45,10 +48,11 @@ export function HomePage() {
       setLoading(true);
       setError("");
       try {
-        const [settings, transactions, commitments] = await Promise.all([
+        const [settings, transactions, commitments, categories] = await Promise.all([
           getBudgetSettings(userId),
           listTransactions(userId),
           listCommitments(userId),
+          listCategories(userId),
         ]);
         if (settings) {
           const nextSummary = calculateBudget({
@@ -56,11 +60,13 @@ export function HomePage() {
             reserve: settings.reserve_amount,
             transactions,
             commitments,
+            categories,
           });
-          setIncome(String(settings.monthly_income));
-          setReserve(String(settings.reserve_amount));
+          setIncome(String(convertAmount(settings.monthly_income, settings.budget_currency, settings.display_currency)));
+          setReserve(String(convertAmount(settings.reserve_amount, settings.budget_currency, settings.display_currency)));
           setPaydayDay(String(settings.payday_day));
           setSummary(nextSummary);
+          setForecast(forecastUntilPayday(nextSummary.freeRemainder, commitments, settings.payday_day));
           setRecommendations(
             getRecommendations(
               nextSummary,
@@ -80,12 +86,14 @@ export function HomePage() {
       }
     }
     void load();
-  }, [user]);
+  }, [user, budgetCurrency, displayCurrency]);
 
   async function saveSettings(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const monthlyIncome = parseNonNegative(income);
-    const reserveAmount = parseNonNegative(reserve);
+    const displayedIncome = parseNonNegative(income);
+    const displayedReserve = parseNonNegative(reserve);
+    const monthlyIncome = displayedIncome === null ? null : convertAmount(displayedIncome, displayCurrency, budgetCurrency);
+    const reserveAmount = displayedReserve === null ? null : convertAmount(displayedReserve, displayCurrency, budgetCurrency);
     const payday = Number(paydayDay);
     if (
       monthlyIncome === null ||
@@ -108,17 +116,20 @@ export function HomePage() {
         reserve_amount: reserveAmount,
         payday_day: payday,
       });
-      const [transactions, commitments] = await Promise.all([
+      const [transactions, commitments, categories] = await Promise.all([
         listTransactions(user.id),
         listCommitments(user.id),
+        listCategories(user.id),
       ]);
       const nextSummary = calculateBudget({
         monthlyIncome,
         reserve: reserveAmount,
         transactions,
         commitments,
+        categories,
       });
       setSummary(nextSummary);
+      setForecast(forecastUntilPayday(nextSummary.freeRemainder, commitments, payday));
       setRecommendations(
         getRecommendations(
           nextSummary,
@@ -130,7 +141,7 @@ export function HomePage() {
       setError(
         saveError instanceof Error
           ? saveError.message
-          : "Impossible d enregistrer les reglages.",
+          : "Impossible d’enregistrer les réglages.",
       );
     } finally {
       setSaving(false);
@@ -142,11 +153,11 @@ export function HomePage() {
       <p className="eyebrow">VUE D'ENSEMBLE</p>
       <h1>Ce mois-ci.</h1>
       <p className="description">
-        Une vue claire de ce qui est deja depense, engage et encore disponible.
+        Renseignez votre revenu, votre réserve et votre jour de paie. Horizon en déduit ce que vous pouvez utiliser ce mois-ci après vos dépenses et vos engagements.
       </p>
       <p className="home-trust">
-        Votre budget, plus clair. Vos decisions, toujours les votres. {" "}
-        <Link to="/decouvrir">Decouvrir Horizon</Link>
+        Votre budget, plus clair. Vos décisions, toujours les vôtres. {" "}
+        <Link to="/decouvrir">Découvrir Horizon</Link>
       </p>
       {loading ? (
         <p>Chargement...</p>
@@ -154,7 +165,7 @@ export function HomePage() {
         <>
           <form className="budget-settings" onSubmit={saveSettings}>
             <div>
-              <label htmlFor="monthly-income">Revenu mensuel net ({budgetCurrency})</label>
+              <label htmlFor="monthly-income">Revenu mensuel net ({displayCurrency})</label>
               <input
                 id="monthly-income"
                 inputMode="decimal"
@@ -165,7 +176,7 @@ export function HomePage() {
               />
             </div>
             <div>
-              <label htmlFor="reserve-amount">Reserve a conserver ({budgetCurrency})</label>
+              <label htmlFor="reserve-amount">Réserve à conserver ({displayCurrency})</label>
               <input
                 id="reserve-amount"
                 inputMode="decimal"
@@ -191,7 +202,7 @@ export function HomePage() {
               {saving
                 ? "Enregistrement..."
                 : summary
-                  ? "Mettre a jour"
+                  ? "Mettre à jour"
                   : "Configurer mon budget"}
             </button>
           </form>
@@ -204,33 +215,47 @@ export function HomePage() {
             <>
               <div className="summary-grid">
                 <article className="summary-card">
-                  <span>Depenses realisees</span>
+                  <span>Revenu mensuel</span>
+                  <strong>{formatAmount(summary.monthlyIncome)}</strong>
+                  <small>Récurrent</small>
+                </article>
+                <article className="summary-card emphasis">
+                  <span>Revenus ponctuels</span>
+                  <strong>{formatAmount(summary.additionalIncome)}</strong>
+                  <small>Prime, don, remboursement</small>
+                </article>
+                <article className="summary-card">
+                  <span>Dépenses réalisées</span>
                   <strong>{formatAmount(summary.realisedExpenses)}</strong>
                   <small>Ce mois</small>
                 </article>
                 <article className="summary-card">
-                  <span>Engagements projetes</span>
+                  <span>Engagements projetés</span>
                   <strong>{formatAmount(summary.projectedCommitments)}</strong>
                   <small>Mensualises</small>
                 </article>
                 <article className="summary-card emphasis">
-                  <span>Reste projete</span>
+                  <span>Reste projeté</span>
                   <strong>{formatAmount(summary.projectedRemainder)}</strong>
                   <small>Avant reserve</small>
                 </article>
                 <article className="summary-card">
-                  <span>Reserve</span>
+                  <span>Réserve</span>
                   <strong>{formatAmount(summary.reserve)}</strong>
-                  <small>A conserver</small>
+                  <small>À conserver</small>
                 </article>
                 <article
                   className={`summary-card ${summary.freeRemainder < 0 ? "negative" : "free"}`}
                 >
                   <span>Reste libre</span>
                   <strong>{formatAmount(summary.freeRemainder)}</strong>
-                  <small>Disponible apres reserve</small>
+                  <small>Disponible après réserve</small>
                 </article>
               </div>
+              {forecast && <section className="payday-forecast" aria-label="Prévision jusqu’à la paie">
+                <div><p className="eyebrow">JUSQU’À LA PAIE</p><h2>{formatAmount(forecast.dailyAllowance)} par jour</h2><p>Sur {forecast.daysRemaining} jour(s), jusqu’au {forecast.payday.toLocaleDateString("fr-FR")}. Ce montant respecte votre réserve et les engagements projetés.</p></div>
+                <div className="forecast-commitments"><strong>{forecast.upcomingCommitments.length} échéance(s) avant la paie</strong>{forecast.upcomingCommitments.slice(0, 3).map((commitment) => <span key={commitment.id}>{commitment.description} · {formatAmount(commitment.amount)} le {new Date(`${commitment.nextDueDate}T00:00:00`).toLocaleDateString("fr-FR")}</span>)}</div>
+              </section>}
               <section
                 className="recommendations"
                 aria-label="Recommandations budgetaires"

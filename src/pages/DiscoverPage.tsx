@@ -1,4 +1,4 @@
-import { ArrowUpRight, FileCheck2, ShieldCheck, TrendingUp } from "lucide-react";
+import { ArrowUpRight, FileCheck2, PiggyBank, ShieldCheck, TrendingUp } from "lucide-react";
 import { Link } from "react-router-dom";
 import "./pages.css";
 
@@ -6,17 +6,22 @@ const steps = [
   {
     icon: TrendingUp,
     title: "Suivre",
-    text: "Ajoutez vos transactions, vos categories et vos engagements recurrents pour voir ce qui reste disponible.",
+    text: "Ajoutez vos transactions, vos catégories et vos engagements récurrents pour comprendre ce qui est déjà utilisé et ce qui reste disponible.",
   },
   {
     icon: FileCheck2,
     title: "Anticiper",
-    text: "Visualisez les echeances avant votre prochaine paie et importez releves, factures ou tickets a verifier.",
+    text: "Visualisez les échéances avant votre prochaine paie et le montant quotidien prudent. Affectez aussi un revenu ponctuel à un objectif d’épargne.",
   },
   {
     icon: ShieldCheck,
+    title: "Vérifier les imports",
+    text: "Importez un relevé, une facture ou un ticket. Chaque ligne reste à vérifier : confirmez-la ou ignorez-la ensuite dans Transactions.",
+  },
+  {
+    icon: PiggyBank,
     title: "Garder la main",
-    text: "L assistant peut proposer une lecture ou une categorie, mais aucune transaction ni engagement n est cree sans votre confirmation.",
+    text: "L’assistant peut proposer une lecture ou une catégorie, mais aucune transaction ni aucun engagement n’est créé sans votre confirmation.",
   },
 ];
 
@@ -26,14 +31,12 @@ export function DiscoverPage() {
       <p className="eyebrow">BIENVENUE DANS HORIZON</p>
       <h1>Votre budget, plus clair.</h1>
       <p className="description">
-        Horizon vous aide a comprendre votre budget, anticiper vos echeances et
-        organiser vos depenses, sans jamais enregistrer une donnee sans votre
-        validation.
+        Horizon vous aide à organiser vos revenus, sorties, épargne et échéances. Les calculs anticipent votre prochaine paie, tandis que chaque import ou proposition de l’assistant reste sous votre contrôle.
       </p>
       <div className="discover-meta" aria-label="Principes Horizon">
-        <span>PRIVE PAR DEFAUT</span>
+        <span>PRIVÉ PAR DÉFAUT</span>
         <span>VALIDATION HUMAINE</span>
-        <span>VISION JUSQU A LA PAIE</span>
+        <span>VISION JUSQU’À LA PAIE</span>
       </div>
       <div className="discover-steps">
         {steps.map(({ icon: Icon, title, text }) => (
@@ -49,8 +52,8 @@ export function DiscoverPage() {
       <section className="discover-privacy">
         <ShieldCheck size={19} aria-hidden="true" />
         <p>
-          Vos donnees sont separees de celles des autres utilisateurs. L
-          assistant est optionnel et vos documents restent a verifier avant
+          Vos données sont séparées de celles des autres utilisateurs. L’
+          assistant est optionnel et vos documents restent à vérifier avant
           toute saisie.
         </p>
       </section>

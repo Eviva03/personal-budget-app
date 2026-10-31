@@ -1,4 +1,4 @@
-import { Download, Pencil, Trash2, X } from "lucide-react";
+import { Check, Download, Pencil, Trash2, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAuth } from "../features/auth/useAuth";
 import { CategoryIcon } from "../features/budget/category-icon";
@@ -28,7 +28,7 @@ function CategoryBadge({ category }: { category?: Category }) {
       {category.name}
     </span>
   ) : (
-    <>Sans categorie</>
+    <>Sans catégorie</>
   );
 }
 
@@ -43,6 +43,8 @@ export function TransactionsPage() {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [categoryId, setCategoryId] = useState("");
+  const [direction, setDirection] = useState("");
+  const [reviewStatus, setReviewFilter] = useState("");
   const [sortBy, setSortBy] = useState("date");
   const [editing, setEditing] = useState<Transaction | null>(null);
   const [saving, setSaving] = useState(false);
@@ -77,7 +79,9 @@ export function TransactionsPage() {
           item.description.toLowerCase().includes(query.toLowerCase())) &&
         (!from || item.occurred_at >= from) &&
         (!to || item.occurred_at <= to) &&
-        (!categoryId || item.category_id === categoryId),
+        (!categoryId || item.category_id === categoryId) &&
+        (!direction || (item.direction ?? categories.find((category) => category.id === item.category_id)?.type ?? "expense") === direction) &&
+        (!reviewStatus || (item.review_status ?? "confirmed") === reviewStatus),
     )
     .sort((left, right) =>
       sortBy === "amount"
@@ -109,6 +113,7 @@ export function TransactionsPage() {
         amount: editing.amount,
         occurred_at: editing.occurred_at,
         category_id: editing.category_id,
+        direction: editing.direction ?? "expense",
       };
       await updateTransaction(user.id, editing.id, changes);
       setItems((current) =>
@@ -144,12 +149,23 @@ export function TransactionsPage() {
     }
   }
 
+  async function setReviewStatus(item: Transaction, status: "confirmed" | "ignored") {
+    if (!user) return;
+    try {
+      await updateTransaction(user.id, item.id, { review_status: status });
+      setItems((current) => current.map((entry) => entry.id === item.id ? { ...entry, review_status: status } : entry));
+      window.dispatchEvent(new Event("budget-data-changed"));
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Impossible de mettre à jour le rapprochement.");
+    }
+  }
+
   return (
     <section className="page-placeholder">
       <p className="eyebrow">SUIVI</p>
       <h1>Transactions</h1>
       <p className="description">
-        Recherchez, corrigez et exportez vos mouvements.
+        Chaque entrée et sortie apparaît ici. Après un import, vérifiez les lignes marquées « À vérifier », puis confirmez-les ou ignorez-les avant de vous y fier.
       </p>
       {user && (
         <TransactionImport
@@ -181,7 +197,7 @@ export function TransactionsPage() {
               placeholder="Rechercher"
             />
             <input
-              aria-label="Date de debut"
+              aria-label="Date de début"
               type="date"
               value={from}
               onChange={(event) => setFrom(event.target.value)}
@@ -193,16 +209,35 @@ export function TransactionsPage() {
               onChange={(event) => setTo(event.target.value)}
             />
             <select
-              aria-label="Filtrer par categorie"
+              aria-label="Filtrer par catégorie"
               value={categoryId}
               onChange={(event) => setCategoryId(event.target.value)}
             >
-              <option value="">Toutes categories</option>
+              <option value="">Toutes les catégories</option>
               {categories.map((category) => (
                 <option key={category.id} value={category.id}>
                   {category.name}
                 </option>
               ))}
+            </select>
+            <select
+              aria-label="Filtrer par sens"
+              value={direction}
+              onChange={(event) => setDirection(event.target.value)}
+            >
+              <option value="">Toutes les entrées et sorties</option>
+              <option value="income">Entrées</option>
+              <option value="expense">Sorties</option>
+            </select>
+            <select
+              aria-label="Filtrer par statut de rapprochement"
+              value={reviewStatus}
+              onChange={(event) => setReviewFilter(event.target.value)}
+            >
+              <option value="">Tous les statuts</option>
+              <option value="needs_review">À vérifier</option>
+              <option value="confirmed">Confirmées</option>
+              <option value="ignored">Ignorées</option>
             </select>
             <select
               aria-label="Trier les transactions"
@@ -216,15 +251,15 @@ export function TransactionsPage() {
             <button
               className="icon-button filter-action"
               type="button"
-              title="Exporter le resultat CSV"
-              aria-label="Exporter le resultat CSV"
+              title="Exporter le résultat CSV"
+              aria-label="Exporter le résultat CSV"
               onClick={exportCsv}
             >
               <Download size={18} />
             </button>
           </div>
           <p className="filter-count">
-            {filtered.length} transaction(s) affichee(s)
+            {filtered.length} transaction(s) affichée(s)
           </p>
           {filtered.length === 0 ? (
             <div className="placeholder-card">
@@ -237,12 +272,13 @@ export function TransactionsPage() {
                 const category = categories.find(
                   (entry) => entry.id === item.category_id,
                 );
+                const itemDirection = item.direction ?? category?.type ?? "expense";
 
                 return (
                 <li
                   key={item.id}
                   className={
-                    category?.type === "income"
+                    itemDirection === "income"
                       ? "transaction-income"
                       : "transaction-expense"
                   }
@@ -255,10 +291,31 @@ export function TransactionsPage() {
                       ).toLocaleDateString("fr-FR")}{" "}
                       ·{" "}
                       <CategoryBadge category={category} />
+                      {(item.review_status ?? "confirmed") === "needs_review" && " · À vérifier"}
                     </span>
                   </div>
-                  <strong>{formatAmount(item.amount)}</strong>
+                  <strong>{itemDirection === "income" ? "+" : "-"}{formatAmount(item.amount)}</strong>
                   <div className="row-actions">
+                    {item.review_status === "needs_review" && <>
+                      <button
+                        className="icon-button"
+                        type="button"
+                        title="Confirmer le mouvement"
+                        aria-label={`Confirmer ${item.description}`}
+                        onClick={() => void setReviewStatus(item, "confirmed")}
+                      >
+                        <Check size={16} />
+                      </button>
+                      <button
+                        className="icon-button"
+                        type="button"
+                        title="Ignorer le mouvement"
+                        aria-label={`Ignorer ${item.description}`}
+                        onClick={() => void setReviewStatus(item, "ignored")}
+                      >
+                        <X size={16} />
+                      </button>
+                    </>}
                     <button
                       className="icon-button"
                       type="button"
@@ -289,14 +346,13 @@ export function TransactionsPage() {
         <div
           className="modal-backdrop"
           role="presentation"
-          onMouseDown={() => setEditing(null)}
+          onClick={(event) => { if (event.target === event.currentTarget) setEditing(null) }}
         >
           <section
             className="entry-modal"
             role="dialog"
             aria-modal="true"
             aria-labelledby="edit-transaction-title"
-            onMouseDown={(event) => event.stopPropagation()}
           >
             <button
               className="icon-button"
@@ -355,6 +411,20 @@ export function TransactionsPage() {
                     {category.name}
                   </option>
                 ))}
+              </select>
+              <label htmlFor="edit-direction">Sens du mouvement</label>
+              <select
+                id="edit-direction"
+                value={editing.direction ?? "expense"}
+                onChange={(event) =>
+                  setEditing({
+                    ...editing,
+                    direction: event.target.value as "income" | "expense",
+                  })
+                }
+              >
+                <option value="expense">Sortie</option>
+                <option value="income">Entree</option>
               </select>
               <button
                 className="primary-button"

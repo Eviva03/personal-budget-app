@@ -56,10 +56,10 @@ function insightFrom(value: unknown): Insight | null {
 }
 
 function geminiFailureMessage(status: number) {
-  if (status === 400 || status === 404) return 'Le modele Gemini configure est indisponible.'
-  if (status === 401 || status === 403) return 'La cle Gemini ne peut pas utiliser le modele configure.'
-  if (status === 429) return 'Gemini limite temporairement les analyses. Reessayez dans quelques minutes.'
-  return 'Gemini est indisponible pour le moment. Reessayez plus tard.'
+  if (status === 400 || status === 404) return 'Le modèle Gemini configuré est indisponible.'
+  if (status === 401 || status === 403) return 'La clé Gemini ne peut pas utiliser le modèle configuré.'
+  if (status === 429) return 'Gemini limite temporairement les analyses. Réessayez dans quelques minutes.'
+  return 'Gemini est indisponible pour le moment. Réessayez plus tard.'
 }
 
 async function generateAnalysis(models: string[], apiKey: string, body: string) {
@@ -89,11 +89,11 @@ export default async function handler(request: ApiRequest, response: ApiResponse
   const geminiModel = process.env.GEMINI_MODEL
   const authorization = request.headers.authorization
   const token = (Array.isArray(authorization) ? authorization[0] : authorization)?.replace(/^Bearer\s+/i, '')
-  if (!geminiKey || !geminiModel) return send(response, { error: 'L assistant n est pas configure.' }, 503)
+  if (!geminiKey || !geminiModel) return send(response, { error: 'L’assistant n’est pas configuré.' }, 503)
   if (!token) return send(response, { error: 'Authentification requise.' }, 401)
 
   const neon = createAuthenticatedNeonClient(token)
-  if (!neon) return send(response, { error: 'L assistant n est pas configure.' }, 503)
+  if (!neon) return send(response, { error: 'L’assistant n’est pas configuré.' }, 503)
   if (!await hasAuthenticatedUser(neon)) return send(response, { error: 'Session invalide.' }, 401)
 
   const today = new Date()
@@ -104,12 +104,12 @@ export default async function handler(request: ApiRequest, response: ApiResponse
     neon.from('transactions').select('amount, occurred_at, category_id').gte('occurred_at', isoDate(monthStart)),
     neon.from('commitments').select('amount, description, due_date, frequency, status'),
   ])
-  if (settingsError || categoriesError || transactionsError || commitmentsError) return send(response, { error: 'Impossible de charger les donnees budgetaires.' }, 500)
+  if (settingsError || categoriesError || transactionsError || commitmentsError) return send(response, { error: 'Impossible de charger les données budgétaires.' }, 500)
   if (!settings) return send(response, { error: 'Configurez votre budget avant cette analyse.' }, 400)
 
   const { data: allowance, error: allowanceError } = await neon.rpc('consume_ai_import_quota')
-  if (allowanceError) return send(response, { error: 'Impossible de verifier le quota assistant.' }, 500)
-  if (!allowance?.allowed) return send(response, { error: allowance?.reason === 'global_limit' ? 'Le budget mensuel de l assistant est atteint.' : 'Votre quota mensuel assistant est atteint.' }, 429)
+  if (allowanceError) return send(response, { error: 'Impossible de vérifier le quota de l’assistant.' }, 500)
+  if (!allowance?.allowed) return send(response, { error: allowance?.reason === 'global_limit' ? 'Le budget mensuel de l’assistant est atteint.' : 'Votre quota mensuel pour l’assistant est atteint.' }, 429)
 
   const typedCategories = (categories ?? []) as Category[]
   const typedTransactions = (transactions ?? []) as Transaction[]
@@ -154,14 +154,14 @@ export default async function handler(request: ApiRequest, response: ApiResponse
     }
     const body = await geminiResponse.json() as { candidates?: { content?: { parts?: { text?: string }[] } }[] }
     const text = body.candidates?.[0]?.content?.parts?.[0]?.text
-    if (!text) return send(response, { error: 'L assistant n a renvoye aucune analyse.' }, 502)
+    if (!text) return send(response, { error: 'L’assistant n’a renvoyé aucune analyse.' }, 502)
     const parsed = JSON.parse(text.trim().replace(/^```(?:json)?\s*|\s*```$/g, ''))
     const insight = insightFrom(parsed)
     if (!insight) console.error('Gemini budget analysis response did not match the insight schema', { response: text.slice(0, 1_000) })
-    if (!insight) return send(response, { error: 'La reponse de l assistant est invalide.' }, 502)
+    if (!insight) return send(response, { error: 'La réponse de l’assistant est invalide.' }, 502)
     return send(response, { insight, estimatedMonthlyCostEur: allowance.estimated_cost_eur, costWarning: allowance.estimated_cost_eur >= 3 })
   } catch (error) {
     console.error('Gemini budget analysis response could not be processed', { error: error instanceof Error ? error.message : String(error) })
-    return send(response, { error: 'Gemini ne repond pas pour le moment. Reessayez dans quelques instants.' }, 502)
+    return send(response, { error: 'Gemini ne répond pas pour le moment. Réessayez dans quelques instants.' }, 502)
   }
 }

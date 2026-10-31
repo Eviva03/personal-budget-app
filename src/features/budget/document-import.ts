@@ -72,15 +72,43 @@ function parseRevolutPdfText(text: string): NewTransaction[] {
   })
 }
 
+const englishMonths: Record<string, string> = {
+  jan: '01', january: '01', feb: '02', february: '02', mar: '03', march: '03', apr: '04', april: '04', may: '05', jun: '06', june: '06', jul: '07', july: '07', aug: '08', august: '08', sep: '09', sept: '09', september: '09', oct: '10', october: '10', nov: '11', november: '11', dec: '12', december: '12'
+}
+
+function parseRevolutScreenshotText(text: string): NewTransaction[] {
+  const pattern = /\b(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+(\d{1,2}),\s+\d{1,2}:\d{2}\s*(?:AM|PM)\s+Completed\s+([+-])\s*(?:€|e)\s*(\d+(?:[.,]\d{1,2})?)/gi
+  const matches = [...text.matchAll(pattern)]
+  const year = new Date().getFullYear()
+  let previousEnd = 0
+
+  return matches.flatMap((match) => {
+    const description = text
+      .slice(previousEnd, match.index)
+      .replace(/^[^\p{L}\p{N}]+/u, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 200)
+    previousEnd = (match.index ?? 0) + match[0].length
+    const month = englishMonths[match[1].toLowerCase()]
+    const amount = parseAmount(match[4].replace(',', '.'))
+    return month && description && amount !== null
+      ? [{ occurred_at: `${year}-${month}-${match[2].padStart(2, '0')}`, description, amount, category_id: null }]
+      : []
+  })
+}
+
 export function parseTransactionsPdfText(text: string): ImportPreview {
   const valid: NewTransaction[] = []
   const errors: string[] = []
   const tableStart = text.search(/\bdate\s+description\s+montant\b/i)
   if (tableStart < 0) {
+    const screenshotTransactions = parseRevolutScreenshotText(text)
+    if (screenshotTransactions.length > 0) return { valid: screenshotTransactions, errors }
     const revolutTransactions = parseRevolutPdfText(text)
     return revolutTransactions.length > 0
       ? { valid: revolutTransactions, errors }
-      : { valid, errors: ['La table des operations est introuvable dans ce PDF. Verifiez le texte avant une saisie manuelle.'] }
+      : { valid, errors: ['La table des opérations est introuvable dans ce document. Vérifiez le texte avant une saisie manuelle.'] }
   }
   const table = text.slice(tableStart)
   const pattern = /(\d{1,2})\s+(janvier|fevrier|février|mars|avril|mai|juin|juillet|aout|août|septembre|octobre|novembre|decembre|décembre)\s+(.+?)\s+(-?[\d\s]+[,.]\d{2})\s*(?:€|\$|EUR|USD)(?=\s|$)/gi
@@ -92,13 +120,13 @@ export function parseTransactionsPdfText(text: string): ImportPreview {
     const rawAmount = Number(match[4].replace(/\s/g, '').replace(',', '.'))
     const amount = Number.isFinite(rawAmount) ? parseAmount(String(Math.abs(rawAmount))) : null
     if (!occurredAt || !description || amount === null) {
-      errors.push('Une operation PDF n a pas pu etre interpretee.')
+      errors.push('Une opération PDF n’a pas pu être interprétée.')
       continue
     }
     valid.push({ occurred_at: occurredAt, description, amount, category_id: null })
   }
 
-  if (valid.length === 0) errors.push('Aucune operation clairement identifiable dans le PDF. Verifiez le texte avant une saisie manuelle.')
+  if (valid.length === 0) errors.push('Aucune opération clairement identifiable dans ce document. Vérifiez le texte avant une saisie manuelle.')
   return { valid, errors }
 }
 
@@ -109,7 +137,7 @@ export function parseTransactionsCsv(csv: string): ImportPreview {
   const valid: NewTransaction[] = []; const errors: string[] = []
   result.data.forEach((row, index) => {
     const description = valueFor(row, descriptionColumns); const date = parseDate(valueFor(row, dateColumns)); const rawAmount = Number(valueFor(row, amountColumns).replace(/\s/g, '').replace(',', '.')); const amount = Number.isFinite(rawAmount) ? parseAmount(String(Math.abs(rawAmount))) : null
-    if (!description || !date || amount === null) { errors.push(`Ligne ${index + 2}: date, montant ou libelle invalide.`); return }
+    if (!description || !date || amount === null) { errors.push(`Ligne ${index + 2} : date, montant ou libellé invalide.`); return }
     valid.push({ description, occurred_at: date, amount, category_id: null })
   })
   if (result.errors.length > 0) errors.push('Le fichier CSV contient une structure invalide.')
@@ -127,7 +155,7 @@ export async function readPdfText(file: File, onProgress?: (progress: number) =>
   const pdfText = pages.join('\n').trim()
   if (pdfText) {
     const preview = parseTransactionsPdfText(pdfText)
-    return { ...preview, errors: preview.valid.length > 0 ? ['Operations detectees dans le PDF. Verifiez-les avant import.'] : preview.errors, pdfText }
+    return { ...preview, errors: preview.valid.length > 0 ? ['Opérations détectées dans le PDF. Vérifiez-les avant l’import.'] : preview.errors, pdfText }
   }
 
   const pageCount = Math.min(document.numPages, 3)
@@ -138,15 +166,15 @@ export async function readPdfText(file: File, onProgress?: (progress: number) =>
       const page = await document.getPage(index + 1); const viewport = page.getViewport({ scale: 2 }); const canvas = window.document.createElement('canvas')
       canvas.width = viewport.width; canvas.height = viewport.height
       const context = canvas.getContext('2d')
-      if (!context) throw new Error('Impossible de creer le rendu OCR.')
+      if (!context) throw new Error('Impossible de créer le rendu OCR.')
       await page.render({ canvas, canvasContext: context, viewport }).promise
-      const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob((value) => value ? resolve(value) : reject(new Error('Impossible de preparer la page pour l OCR.')), 'image/png'))
+      const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob((value) => value ? resolve(value) : reject(new Error('Impossible de préparer la page pour l’OCR.')), 'image/png'))
       return (await worker.recognize(blob)).data.text
     }))
     const ocrText = recognisedPages.join('\n').trim()
-    if (!ocrText) return { valid: [], errors: ['L OCR n a pas pu lire ce document.'], pdfText: ocrText }
+    if (!ocrText) return { valid: [], errors: ['L’OCR n’a pas pu lire ce document.'], pdfText: ocrText }
     const preview = parseTransactionsPdfText(ocrText)
-    return { ...preview, errors: preview.valid.length > 0 ? ['Operations detectees par OCR. Verifiez-les avant import.'] : preview.errors, pdfText: ocrText }
+    return { ...preview, errors: preview.valid.length > 0 ? ['Opérations détectées par OCR. Vérifiez-les avant l’import.'] : preview.errors, pdfText: ocrText }
   } finally { await worker.terminate() }
 }
 
@@ -155,9 +183,9 @@ export async function readImageText(file: File, onProgress?: (progress: number) 
   const worker = await createWorker('fra', 1, { logger: (event) => { if (event.status === 'recognizing text') onProgress?.(Math.round(event.progress * 100)) } })
   try {
     const imageText = (await worker.recognize(file)).data.text.trim()
-    if (!imageText) return { valid: [], errors: ['L OCR n a pas pu lire cette image.'], pdfText: imageText }
+    if (!imageText) return { valid: [], errors: ['L’OCR n’a pas pu lire cette image.'], pdfText: imageText }
     const preview = parseTransactionsPdfText(imageText)
-    return { ...preview, errors: preview.valid.length > 0 ? ['Operations detectees dans l image. Verifiez-les avant import.'] : preview.errors, pdfText: imageText }
+    return { ...preview, errors: preview.valid.length > 0 ? ['Opérations détectées dans l’image. Vérifiez-les avant l’import.'] : preview.errors, pdfText: imageText }
   } finally { await worker.terminate() }
 }
 

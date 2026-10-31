@@ -15,6 +15,7 @@ import {
   listTransactions,
 } from "../features/budget/budget-repository";
 import { useCurrency } from "../features/budget/CurrencyProvider";
+import { confirmGeminiConsent } from "../features/budget/gemini-consent";
 import {
   commitmentsUntilPayday,
   nextPayday,
@@ -62,7 +63,7 @@ export function AnalysisPage() {
           ]);
         if (!settings) {
           setError(
-            "Configurez votre budget depuis l accueil pour voir votre projection.",
+            "Configurez votre budget depuis l’accueil pour voir votre projection.",
           );
           return;
         }
@@ -102,13 +103,14 @@ export function AnalysisPage() {
     void load();
   }, [user]);
   async function runAnalysisAssistant() {
+    if (!confirmGeminiConsent()) return;
     if (!neon) {
-      setAssistantMessage("L assistant demande une session Neon configuree.");
+      setAssistantMessage("L’assistant nécessite une session Neon configurée.");
       return;
     }
     const { data: sessionData } = await neon.auth.getSession();
     if (!sessionData.session) {
-      setAssistantMessage("Connectez-vous avant d utiliser l assistant.");
+      setAssistantMessage("Connectez-vous avant d’utiliser l’assistant.");
       return;
     }
     setAssistantLoading(true);
@@ -124,17 +126,17 @@ export function AnalysisPage() {
         costWarning?: boolean;
       };
       if (!response.ok || !body.insight) {
-        setAssistantMessage(body.error || "L assistant est indisponible.");
+        setAssistantMessage(body.error || "L’assistant est indisponible.");
         return;
       }
       setInsight(body.insight);
       setAssistantMessage(
         body.costWarning
-          ? "Analyse recue. Le budget assistant mensuel approche 3 EUR."
-          : "Analyse recue a partir des donnees de votre compte.",
+          ? "Analyse reçue. Le budget mensuel de l’assistant approche 3 EUR."
+          : "Analyse reçue à partir des données de votre compte.",
       );
     } catch {
-      setAssistantMessage("Impossible de joindre l assistant.");
+      setAssistantMessage("Impossible de joindre l’assistant.");
     } finally {
       setAssistantLoading(false);
     }
@@ -154,8 +156,7 @@ export function AnalysisPage() {
       <p className="eyebrow">COMPRENDRE</p>
       <h1>Projection.</h1>
       <p className="description">
-        Les depenses prevues jusqu a votre prochaine paie et le rythme de vos
-        sorties ce mois-ci.
+        Cette page examine la période avant votre prochaine paie : les échéances à couvrir, vos sorties déjà enregistrées et le montant restant. Gemini peut ensuite proposer une lecture, mais ne modifie jamais votre budget.
       </p>
       {loading ? (
         <p>Chargement...</p>
@@ -172,7 +173,7 @@ export function AnalysisPage() {
               <span>Prochaine paie</span>
               <strong>
                 {daysUntilPayday === 0
-                  ? "Aujourd hui"
+                  ? "Aujourd’hui"
                   : `${daysUntilPayday} jour${daysUntilPayday > 1 ? "s" : ""}`}
               </strong>
             </article>
@@ -183,7 +184,7 @@ export function AnalysisPage() {
             </article>
             <article className="analysis-metric expense-metric">
               <TrendingDown size={19} />
-              <span>Depense ce mois</span>
+              <span>Dépenses ce mois-ci</span>
               <strong>{formatAmount(spendingTotal)}</strong>
             </article>
             <article className="analysis-metric">
@@ -200,10 +201,10 @@ export function AnalysisPage() {
           <section className="analysis-assistant" aria-live="polite">
             <div className="analysis-assistant-heading">
               <div>
-                <p className="panel-label">RESTE AVANT PAIE</p>
+                <p className="panel-label">RESTE AVANT LA PAIE</p>
                 <h2>{formatAmount(availableUntilPayday)} disponible.</h2>
                 <p className="analysis-assistant-message">
-                  Apres {formatAmount(reserveAmount)} de reserve et {formatAmount(upcomingTotal)} d echeances prevues.
+                  Après {formatAmount(reserveAmount)} de réserve et {formatAmount(upcomingTotal)} d’échéances prévues.
                 </p>
               </div>
               <button
@@ -228,15 +229,15 @@ export function AnalysisPage() {
                     {insight.risks.length > 0 ? (
                       <ul>{insight.risks.map((risk) => <li key={risk}>{risk}</li>)}</ul>
                     ) : (
-                      <p>Aucun risque particulier signale.</p>
+                      <p>Aucun risque particulier signalé.</p>
                     )}
                   </section>
                   <section>
-                    <h3>Depenses inhabituelles</h3>
+                    <h3>Dépenses inhabituelles</h3>
                     {insight.anomalies.length > 0 ? (
                       <ul>{insight.anomalies.map((anomaly) => <li key={anomaly}>{anomaly}</li>)}</ul>
                     ) : (
-                      <p>Aucune anomalie identifiee.</p>
+                      <p>Aucune anomalie identifiée.</p>
                     )}
                   </section>
                   <section>
@@ -264,13 +265,13 @@ export function AnalysisPage() {
                 </span>
               </div>
               <p className="panel-subtitle">
-                {upcoming.length} echeance{upcoming.length > 1 ? "s" : ""} a
+                {upcoming.length} échéance{upcoming.length > 1 ? "s" : ""} à
                 couvrir avant cette date
               </p>
               <ol className="timeline">
                 {upcoming.length === 0 ? (
                   <li className="timeline-empty">
-                    Aucune echeance avant la prochaine paie.
+                    Aucune échéance avant la prochaine paie.
                   </li>
                 ) : (
                   upcoming.map((item) => (
@@ -288,7 +289,7 @@ export function AnalysisPage() {
                         <span>
                           {item.frequency === "once"
                             ? "Ponctuel"
-                            : "Engagement recurrent"}
+                            : "Engagement récurrent"}
                         </span>
                       </div>
                       <b>{formatAmount(item.amount)}</b>

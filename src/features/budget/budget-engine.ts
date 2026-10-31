@@ -1,14 +1,18 @@
-import type { Commitment, Transaction } from './types'
+import type { Category, Commitment, Transaction } from './types'
 
 type EngineInput = {
   monthlyIncome: number
   reserve: number
   transactions: Transaction[]
   commitments: Commitment[]
+  categories?: Category[]
   referenceDate?: Date
 }
 
 export type BudgetSummary = {
+  monthlyIncome: number
+  additionalIncome: number
+  totalIncome: number
   realisedExpenses: number
   projectedCommitments: number
   projectedRemainder: number
@@ -48,9 +52,14 @@ function monthlyCommitmentAmount(commitment: Commitment, referenceDate: Date) {
 
 function round(amount: number) { return Math.round(amount * 100) / 100 }
 
-export function calculateBudget({ monthlyIncome, reserve, transactions, commitments, referenceDate = new Date() }: EngineInput): BudgetSummary {
-  const realisedExpenses = transactions.filter((transaction) => isInMonth(transaction.occurred_at, referenceDate)).reduce((sum, transaction) => sum + transaction.amount, 0)
+export function calculateBudget({ monthlyIncome, reserve, transactions, commitments, categories = [], referenceDate = new Date() }: EngineInput): BudgetSummary {
+  const incomeCategoryIds = new Set(categories.filter((category) => category.type === 'income').map((category) => category.id))
+  const monthlyTransactions = transactions.filter((transaction) => isInMonth(transaction.occurred_at, referenceDate))
+  const isIncome = (transaction: Transaction) => transaction.direction === 'income' || (!transaction.direction && incomeCategoryIds.has(transaction.category_id ?? ''))
+  const additionalIncome = monthlyTransactions.filter(isIncome).reduce((sum, transaction) => sum + transaction.amount, 0)
+  const realisedExpenses = monthlyTransactions.filter((transaction) => !isIncome(transaction)).reduce((sum, transaction) => sum + transaction.amount, 0)
   const projectedCommitments = commitments.reduce((sum, commitment) => sum + monthlyCommitmentAmount(commitment, referenceDate), 0)
-  const projectedRemainder = monthlyIncome - realisedExpenses - projectedCommitments
-  return { realisedExpenses: round(realisedExpenses), projectedCommitments: round(projectedCommitments), projectedRemainder: round(projectedRemainder), reserve: round(reserve), freeRemainder: round(projectedRemainder - reserve) }
+  const totalIncome = monthlyIncome + additionalIncome
+  const projectedRemainder = totalIncome - realisedExpenses - projectedCommitments
+  return { monthlyIncome: round(monthlyIncome), additionalIncome: round(additionalIncome), totalIncome: round(totalIncome), realisedExpenses: round(realisedExpenses), projectedCommitments: round(projectedCommitments), projectedRemainder: round(projectedRemainder), reserve: round(reserve), freeRemainder: round(projectedRemainder - reserve) }
 }

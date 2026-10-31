@@ -1,8 +1,8 @@
 import { neon } from '../../lib/neon'
-import type { BudgetSettings, Category, CategoryType, Commitment, NewCommitment, NewTransaction, Transaction } from './types'
+import type { BudgetSettings, Category, CategoryType, Commitment, GoalAllocation, ImportJournalEntry, MerchantRule, NewCommitment, NewTransaction, SavingsGoal, Transaction } from './types'
 
 function client() {
-  if (!neon) throw new Error('Neon n est pas configure.')
+  if (!neon) throw new Error('Neon n’est pas configuré.')
   return neon
 }
 
@@ -87,6 +87,65 @@ export async function updateCommitment(userId: string, commitmentId: string, cha
 export async function deleteCommitment(userId: string, commitmentId: string) {
   const { error } = await client().from('commitments').delete().eq('id', commitmentId).eq('user_id', userId)
   if (error) throw error
+}
+
+export async function listSavingsGoals(userId: string) {
+  const { data, error } = await client().from('savings_goals').select('*').eq('user_id', userId).order('created_at')
+  if (error) throw error
+  return data as SavingsGoal[]
+}
+
+export async function createSavingsGoal(userId: string, goal: Pick<SavingsGoal, 'name' | 'target_amount' | 'target_date'>) {
+  const { data, error } = await client().from('savings_goals').insert({ ...goal, user_id: userId }).select().single()
+  if (error) throw error
+  return data as SavingsGoal
+}
+
+export async function listGoalAllocations(userId: string) {
+  const { data, error } = await client().from('goal_allocations').select('*').eq('user_id', userId).order('allocated_at', { ascending: false })
+  if (error) throw error
+  return data as GoalAllocation[]
+}
+
+export async function createGoalAllocation(userId: string, allocation: Pick<GoalAllocation, 'goal_id' | 'transaction_id' | 'amount' | 'allocated_at'>) {
+  const { data, error } = await client().from('goal_allocations').insert({ ...allocation, user_id: userId }).select().single()
+  if (error) throw error
+  return data as GoalAllocation
+}
+
+export async function listMerchantRules(userId: string) {
+  const { data, error } = await client().from('merchant_rules').select('*').eq('user_id', userId).order('created_at')
+  if (error) throw error
+  return data as MerchantRule[]
+}
+
+export async function createMerchantRule(userId: string, rule: Pick<MerchantRule, 'pattern' | 'category_id' | 'direction'>) {
+  const { data, error } = await client().from('merchant_rules').insert({ ...rule, user_id: userId }).select().single()
+  if (error) throw error
+  return data as MerchantRule
+}
+
+export async function deleteMerchantRule(userId: string, ruleId: string) {
+  const { error } = await client().from('merchant_rules').delete().eq('id', ruleId).eq('user_id', userId)
+  if (error) throw error
+}
+
+export async function listImportJournal(userId: string) {
+  const { data, error } = await client().from('import_journal').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(10)
+  if (error) throw error
+  return data as ImportJournalEntry[]
+}
+
+export async function createImportJournalEntry(userId: string, entry: Pick<ImportJournalEntry, 'file_name' | 'document_type' | 'source' | 'status' | 'detected_count' | 'imported_count' | 'message'>) {
+  const { data, error } = await client().from('import_journal').insert({ ...entry, user_id: userId }).select().single()
+  if (error) throw error
+  return data as ImportJournalEntry
+}
+
+export async function updateImportJournalEntry(userId: string, entryId: string, changes: Partial<Pick<ImportJournalEntry, 'document_type' | 'source' | 'status' | 'detected_count' | 'imported_count' | 'message'>>) {
+  const { data, error } = await client().from('import_journal').update({ ...changes, updated_at: new Date().toISOString() }).eq('id', entryId).eq('user_id', userId).select().single()
+  if (error) throw error
+  return data as ImportJournalEntry
 }
 
 export async function getBudgetSettings(userId: string) {

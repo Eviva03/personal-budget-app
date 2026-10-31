@@ -1,11 +1,15 @@
 import { FileText, Upload, X } from "lucide-react";
 import { useState, type ChangeEvent } from "react";
 import {
+  createImportJournalEntry,
   createCommitment,
   createTransaction,
   createTransactions,
   listCategories,
+  listImportJournal,
+  listMerchantRules,
   listTransactions,
+  updateImportJournalEntry,
 } from "./budget-repository";
 import {
   parseTransactionsCsv,
@@ -14,14 +18,18 @@ import {
   transactionFingerprint,
   type ImportPreview,
 } from "./document-import";
+import { merchantRuleFor } from "./merchant-rules";
 import {
   analyzeDocumentText,
   type DocumentAnalysis,
 } from "./document-intelligence";
+import { confirmGeminiConsent } from "./gemini-consent";
 import { suggestImport } from "./import-suggestions";
 import type {
   Category,
   CommitmentFrequency,
+  ImportDocumentType,
+  ImportJournalEntry,
   NewCommitment,
   NewTransaction,
   Transaction,
@@ -43,6 +51,12 @@ type DocumentAssistantProposal = {
   categoryId: string | null;
   confidence: "low" | "medium" | "high";
   explanation: string;
+  transactions: Array<{
+    description: string;
+    amount: number;
+    occurredAt: string;
+    categoryId: string | null;
+  }>;
 };
 const today = new Date().toISOString().slice(0, 10);
 
@@ -53,6 +67,8 @@ export function TransactionImport({
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [history, setHistory] = useState<Transaction[]>([]);
+  const [journal, setJournal] = useState<ImportJournalEntry[]>([]);
+  const [journalEntryId, setJournalEntryId] = useState<string | null>(null);
   const [documentAnalysis, setDocumentAnalysis] =
     useState<DocumentAnalysis | null>(null);
   const [open, setOpen] = useState(false);
@@ -73,6 +89,13 @@ export function TransactionImport({
   const [transactionSaving, setTransactionSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [ocrProgress, setOcrProgress] = useState<number | null>(null);
+  async function loadJournal() {
+    try { setJournal(await listImportJournal(userId)); } catch { }
+  }
+  function documentType(isPdf: boolean, isImage: boolean, kind?: DocumentAssistantProposal["kind"] | DocumentAnalysis["kind"]): ImportDocumentType {
+    if (kind === "receipt" || kind === "invoice" || kind === "bank_statement") return kind;
+    return isPdf ? "pdf" : isImage ? "image" : "csv";
+  }
   async function selectFile(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -90,8 +113,9 @@ export function TransactionImport({
     setTransactionDraft(null);
     setAssistantSuggestions([]);
     setOcrProgress(null);
+    setJournalEntryId(null);
     try {
-      const [nextPreview, availableCategories, transactions] = await Promise.all([
+      const [nextPreview, availableCategories, transactions, rules] = await Promise.all([
         isPdf
           ? readPdfText(file, setOcrProgress)
           : isImage
@@ -99,6 +123,7 @@ export function TransactionImport({
             : file.text().then(parseTransactionsCsv),
         listCategories(userId),
         listTransactions(userId),
+        listMerchantRules(userId),
       ]);
       setCategories(availableCategories);
       setHistory(transactions);
@@ -107,6 +132,17 @@ export function TransactionImport({
           ? analyzeDocumentText(nextPreview.pdfText, nextPreview.valid)
           : null;
       setDocumentAnalysis(analysis);
+      const journalEntry = await createImportJournalEntry(userId, {
+        file_name: file.name,
+        document_type: documentType(isPdf, isImage, analysis?.kind),
+        source: "local",
+        status: nextPreview.valid.length > 0 ? "proposed" : "failed",
+        detected_count: nextPreview.valid.length,
+        imported_count: 0,
+        message: nextPreview.errors[0] ?? null,
+      }).catch(() => null);
+      setJournalEntryId(journalEntry?.id ?? null);
+      if (journalEntry) void loadJournal();
       const receipt = analysis?.kind === "receipt" ? analysis.invoice : null;
       if (receipt?.amount && receipt.amount > 0) {
         const draft: NewTransaction = {
@@ -128,14 +164,19 @@ export function TransactionImport({
         ...nextPreview,
         valid: nextPreview.valid.map((transaction) => ({
           ...transaction,
-          category_id: suggestImport(
-            transaction,
-            availableCategories,
-            transactions,
-          ).categoryId,
+          category_id: merchantRuleFor(transaction, rules)?.category_id ?? suggestImport(transaction, availableCategories, transactions).categoryId,
         })),
       });
     } catch (error) {
+      void createImportJournalEntry(userId, {
+        file_name: file.name,
+        document_type: documentType(isPdf, isImage),
+        source: "local",
+        status: "failed",
+        detected_count: 0,
+        imported_count: 0,
+        message: error instanceof Error ? error.message : "Impossible de lire ce document.",
+      }).then(() => loadJournal()).catch(() => undefined);
       setMessage(
         error instanceof Error
           ? error.message
@@ -179,16 +220,17 @@ export function TransactionImport({
         : "annuelle";
   }
   function documentKindLabel(kind: DocumentAnalysis["kind"]) {
-    if (kind === "bank_statement") return "Releve bancaire";
+    if (kind === "bank_statement") return "Relevé bancaire";
     if (kind === "invoice") return "Facture";
-    if (kind === "receipt") return "Ticket ou recu";
-    return "Document a verifier";
+    if (kind === "receipt") return "Ticket ou reçu";
+    return "Document à vérifier";
   }
   async function improveWithAssistant() {
     if (!preview || !neon) {
-      setMessage("L assistant demande une session Neon configuree.");
+      setMessage("L’assistant nécessite une session Neon configurée.");
       return;
     }
+    if (!confirmGeminiConsent()) return;
     const lines = preview.valid
       .map((transaction, index) => ({
         transaction,
@@ -198,12 +240,12 @@ export function TransactionImport({
       .filter(({ suggestion }) => suggestion.confidence !== "high")
       .slice(0, 10);
     if (lines.length === 0) {
-      setMessage("Les lignes importees ont deja des suggestions locales fiables.");
+      setMessage("Les lignes importées ont déjà des suggestions locales fiables.");
       return;
     }
     const { data: sessionData } = await neon.auth.getSession();
     if (!sessionData.session) {
-      setMessage("Connectez-vous avant d utiliser l assistant.");
+      setMessage("Connectez-vous avant d’utiliser l’assistant.");
       return;
     }
     setAssistantLoading(true);
@@ -231,29 +273,30 @@ export function TransactionImport({
         costWarning?: boolean;
       };
       if (!response.ok) {
-        setMessage(body.error || "L assistant est indisponible.");
+        setMessage(body.error || "L’assistant est indisponible.");
         return;
       }
       setAssistantSuggestions(body.suggestions ?? []);
       setMessage(
         body.costWarning
-          ? "Propositions recues. Le budget assistant mensuel approche 3 EUR."
-          : "Propositions recues. Choisissez celles a appliquer.",
+          ? "Propositions reçues. Le budget mensuel de l’assistant approche 3 EUR."
+          : "Propositions reçues. Choisissez celles à appliquer.",
       );
     } catch {
-      setMessage("Impossible de joindre l assistant.");
+      setMessage("Impossible de joindre l’assistant.");
     } finally {
       setAssistantLoading(false);
     }
   }
   async function analyzeDocumentWithAssistant() {
     if (!preview?.pdfText || !neon) {
-      setMessage("Choisissez un document lisible et connectez-vous avant cette analyse.");
+      setMessage("Choisissez un document lisible et connectez-vous avant de lancer cette analyse.");
       return;
     }
+    if (!confirmGeminiConsent()) return;
     const { data: sessionData } = await neon.auth.getSession();
     if (!sessionData.session) {
-      setMessage("Connectez-vous avant d utiliser l assistant.");
+      setMessage("Connectez-vous avant d’utiliser l’assistant.");
       return;
     }
     setDocumentAssistantLoading(true);
@@ -276,10 +319,47 @@ export function TransactionImport({
         costWarning?: boolean;
       };
       if (!response.ok || !body.proposal) {
-        setMessage(body.error || "L assistant est indisponible.");
+        setMessage(body.error || "L’assistant est indisponible.");
         return;
       }
       setDocumentProposal(body.proposal);
+      if (journalEntryId) {
+        void updateImportJournalEntry(userId, journalEntryId, {
+          source: "assistant",
+          document_type: documentType(false, false, body.proposal.kind),
+          detected_count: body.proposal.transactions.length || preview.valid.length,
+          message: body.proposal.explanation,
+        }).then(() => loadJournal());
+      }
+      if (body.proposal.kind === "bank_statement" && body.proposal.transactions.length > 0) {
+        const extractedTransactions = body.proposal.transactions.map(
+          (transaction) => {
+            const draft: NewTransaction = {
+              description: transaction.description,
+              amount: transaction.amount,
+              occurred_at: transaction.occurredAt,
+              category_id: transaction.categoryId,
+            };
+            return {
+              ...draft,
+              category_id:
+                draft.category_id ??
+                suggestImport(draft, categories, history).categoryId,
+            };
+          },
+        );
+        setPreview((current) =>
+          current
+            ? {
+                ...current,
+                valid: extractedTransactions,
+                errors: [
+                  "Opérations proposées par l’assistant. Vérifiez chaque champ avant l’import.",
+                ],
+              }
+            : current,
+        );
+      }
       setCommitmentDraft(
         body.proposal.kind === "invoice" &&
           body.proposal.amount !== null &&
@@ -309,11 +389,11 @@ export function TransactionImport({
       );
       setMessage(
         body.costWarning
-          ? "Analyse recue. Le budget assistant mensuel approche 3 EUR."
-          : "Analyse recue. Verifiez la proposition avant toute saisie.",
+          ? "Analyse reçue. Le budget mensuel de l’assistant approche 3 EUR."
+          : "Analyse reçue. Vérifiez la proposition avant toute saisie.",
       );
     } catch {
-      setMessage("Impossible de joindre l assistant.");
+      setMessage("Impossible de joindre l’assistant.");
     } finally {
       setDocumentAssistantLoading(false);
     }
@@ -344,21 +424,21 @@ export function TransactionImport({
       !Number.isFinite(commitmentDraft.amount) ||
       commitmentDraft.amount <= 0
     ) {
-      setMessage("Corrigez le libelle, le montant et l echeance avant creation.");
+      setMessage("Corrigez le libellé, le montant et l’échéance avant la création.");
       return;
     }
-    if (!window.confirm("Creer cet engagement dans votre budget ?")) return;
+    if (!window.confirm("Créer cet engagement dans votre budget ?")) return;
     setCommitmentSaving(true);
     try {
       await createCommitment(userId, commitmentDraft);
       onImported();
       setCommitmentDraft(null);
-      setMessage("Engagement cree a partir de la facture validee.");
+      setMessage("Engagement créé à partir de la facture validée.");
     } catch (error) {
       setMessage(
         error instanceof Error
           ? error.message
-          : "Impossible de creer cet engagement.",
+          : "Impossible de créer cet engagement.",
       );
     } finally {
       setCommitmentSaving(false);
@@ -390,10 +470,10 @@ export function TransactionImport({
       !Number.isFinite(transactionDraft.amount) ||
       transactionDraft.amount <= 0
     ) {
-      setMessage("Corrigez le libelle, le montant et la date avant creation.");
+      setMessage("Corrigez le libellé, le montant et la date avant la création.");
       return;
     }
-    if (!window.confirm("Creer cette transaction dans votre budget ?")) return;
+    if (!window.confirm("Créer cette transaction dans votre budget ?")) return;
     setTransactionSaving(true);
     try {
       const existing = await listTransactions(userId);
@@ -404,18 +484,18 @@ export function TransactionImport({
             transactionFingerprint(transactionDraft),
         )
       ) {
-        setMessage("Cette transaction existe deja et n a pas ete creee.");
+        setMessage("Cette transaction existe déjà et n’a pas été créée.");
         return;
       }
       await createTransaction(userId, transactionDraft);
       onImported();
       setTransactionDraft(null);
-      setMessage("Transaction creee a partir du ticket valide.");
+      setMessage("Transaction créée à partir du ticket validé.");
     } catch (error) {
       setMessage(
         error instanceof Error
           ? error.message
-          : "Impossible de creer cette transaction.",
+          : "Impossible de créer cette transaction.",
       );
     } finally {
       setTransactionSaving(false);
@@ -433,7 +513,7 @@ export function TransactionImport({
       )
     ) {
       setMessage(
-        "Corrigez les lignes incompletes ou les montants invalides avant import.",
+        "Corrigez les lignes incomplètes ou les montants invalides avant l’import.",
       );
       return;
     }
@@ -448,15 +528,28 @@ export function TransactionImport({
         return true;
       });
       if (transactions.length === 0) {
+        if (journalEntryId) void updateImportJournalEntry(userId, journalEntryId, { status: "dismissed", message: "Toutes les lignes existent déjà." }).then(() => loadJournal());
         setMessage(
-          "Toutes les lignes existent deja et n ont pas ete importees.",
+          "Toutes les lignes existent déjà et n’ont pas été importées.",
         );
         return;
       }
-      await createTransactions(userId, transactions);
+      await createTransactions(userId, transactions.map((transaction) => ({
+        ...transaction,
+        direction: transaction.direction ?? "expense",
+        review_status: "needs_review",
+        source: "import",
+        merchant_name: transaction.merchant_name ?? transaction.description,
+      })));
+      if (journalEntryId) await updateImportJournalEntry(userId, journalEntryId, {
+        status: transactions.length === preview.valid.length ? "imported" : "partial",
+        imported_count: transactions.length,
+        message: transactions.length === preview.valid.length ? "Import terminé. Les lignes restent à vérifier." : `${preview.valid.length - transactions.length} doublon(s) ignoré(s).`,
+      });
+      void loadJournal();
       onImported();
       setMessage(
-        `${transactions.length} transaction(s) importee(s)${transactions.length < preview.valid.length ? `, ${preview.valid.length - transactions.length} doublon(s) ignore(s).` : "."}`,
+        `${transactions.length} transaction(s) importée(s) à vérifier${transactions.length < preview.valid.length ? `, ${preview.valid.length - transactions.length} doublon(s) ignoré(s).` : "."}`,
       );
       setPreview(null);
     } catch (error) {
@@ -474,7 +567,8 @@ export function TransactionImport({
               .filter(Boolean)
               .join(" ")
           : "";
-      setMessage(details || "Impossible d importer les transactions.");
+      setMessage(details || "Impossible d’importer les transactions.");
+      if (journalEntryId) void updateImportJournalEntry(userId, journalEntryId, { status: "failed", message: details || "Import impossible." }).then(() => loadJournal());
     } finally {
       setSaving(false);
     }
@@ -505,10 +599,11 @@ export function TransactionImport({
               Lecture OCR en cours: {ocrProgress}%
             </p>
           )}
+          {journal.length > 0 && <details className="import-journal"><summary>Journal des imports</summary><ul>{journal.map((entry) => <li key={entry.id}><div><strong>{entry.file_name}</strong><span>{entry.status === "proposed" ? "À vérifier" : entry.status === "imported" ? "Importé" : entry.status === "partial" ? "Partiel" : entry.status === "dismissed" ? "Ignoré" : "Échec"} · {entry.detected_count} ligne(s) détectée(s)</span></div>{entry.message && <p>{entry.message}</p>}</li>)}</ul></details>}
           {preview && (
             <>
               <p className="import-result">
-                {preview.valid.length} ligne(s) valide(s) detectee(s).
+                {preview.valid.length} ligne(s) valide(s) détectée(s).
               </p>
               {preview.errors.map((error) => (
                 <p className="form-message" key={error}>
@@ -534,7 +629,7 @@ export function TransactionImport({
                       {documentAnalysis.invoice.amount !== null &&
                         `, ${documentAnalysis.invoice.amount.toFixed(2)} EUR`}
                       {documentAnalysis.invoice.dueDate &&
-                        `, echeance le ${documentAnalysis.invoice.dueDate}`}
+                        `, échéance le ${documentAnalysis.invoice.dueDate}`}
                     </p>
                   )}
                 </section>
@@ -542,13 +637,13 @@ export function TransactionImport({
               {transactionDraft && (
                 <section className="document-transaction-proposal">
                   <p>
-                    <strong>Transaction proposee</strong>
+                    <strong>Transaction proposée</strong>
                     {" - "}
-                    verifiez les informations du ticket avant creation.
+                    vérifiez les informations du ticket avant la création.
                   </p>
                   <div className="document-transaction-draft">
                     <input
-                      aria-label="Libelle de la transaction proposee"
+                      aria-label="Libellé de la transaction proposée"
                       value={transactionDraft.description}
                       onChange={(event) =>
                         updateTransactionDraft("description", event.target.value)
@@ -556,7 +651,7 @@ export function TransactionImport({
                       maxLength={200}
                     />
                     <input
-                      aria-label="Montant de la transaction proposee"
+                      aria-label="Montant de la transaction proposée"
                       type="number"
                       min="0.01"
                       step="0.01"
@@ -566,7 +661,7 @@ export function TransactionImport({
                       }
                     />
                     <input
-                      aria-label="Date de la transaction proposee"
+                      aria-label="Date de la transaction proposée"
                       type="date"
                       value={transactionDraft.occurred_at}
                       onChange={(event) =>
@@ -577,7 +672,7 @@ export function TransactionImport({
                       }
                     />
                     <select
-                      aria-label="Categorie de la transaction proposee"
+                      aria-label="Catégorie de la transaction proposée"
                       value={transactionDraft.category_id ?? ""}
                       onChange={(event) =>
                         updateTransactionDraft(
@@ -586,7 +681,7 @@ export function TransactionImport({
                         )
                       }
                     >
-                      <option value="">Sans categorie</option>
+                      <option value="">Sans catégorie</option>
                       {categories
                         .filter((category) => category.type === "expense")
                         .map((category) => (
@@ -602,8 +697,8 @@ export function TransactionImport({
                       disabled={transactionSaving}
                     >
                       {transactionSaving
-                        ? "Creation..."
-                        : "Creer la transaction"}
+                        ? "Création..."
+                        : "Créer la transaction"}
                     </button>
                   </div>
                 </section>
@@ -617,7 +712,7 @@ export function TransactionImport({
                 >
                   {documentAssistantLoading
                     ? "Analyse du document..."
-                    : "Analyser ce document avec l assistant"}
+                    : "Analyser ce document avec l’assistant"}
                 </button>
               )}
               {documentProposal && (
@@ -632,12 +727,12 @@ export function TransactionImport({
                     {documentProposal.amount !== null &&
                       `, ${documentProposal.amount.toFixed(2)} EUR`}
                     {documentProposal.dueDate &&
-                      `, echeance le ${documentProposal.dueDate}`}
+                      `, échéance le ${documentProposal.dueDate}`}
                   </p>
                   {commitmentDraft && (
                     <div className="document-commitment-draft">
                       <input
-                        aria-label="Libelle de l engagement propose"
+                        aria-label="Libellé de l’engagement proposé"
                         value={commitmentDraft.description}
                         onChange={(event) =>
                           updateCommitmentDraft(
@@ -648,7 +743,7 @@ export function TransactionImport({
                         maxLength={200}
                       />
                       <input
-                        aria-label="Montant de l engagement propose"
+                        aria-label="Montant de l’engagement proposé"
                         type="number"
                         min="0.01"
                         step="0.01"
@@ -658,7 +753,7 @@ export function TransactionImport({
                         }
                       />
                       <input
-                        aria-label="Echeance de l engagement propose"
+                        aria-label="Échéance de l’engagement proposé"
                         type="date"
                         value={commitmentDraft.due_date}
                         onChange={(event) =>
@@ -669,7 +764,7 @@ export function TransactionImport({
                         }
                       />
                       <select
-                        aria-label="Frequence de l engagement propose"
+                        aria-label="Fréquence de l’engagement proposé"
                         value={commitmentDraft.frequency}
                         onChange={(event) =>
                           updateCommitmentDraft(
@@ -684,7 +779,7 @@ export function TransactionImport({
                         <option value="yearly">Annuelle</option>
                       </select>
                       <select
-                        aria-label="Categorie de l engagement propose"
+                        aria-label="Catégorie de l’engagement proposé"
                         value={commitmentDraft.category_id ?? ""}
                         onChange={(event) =>
                           updateCommitmentDraft(
@@ -693,7 +788,7 @@ export function TransactionImport({
                           )
                         }
                       >
-                        <option value="">Sans categorie</option>
+                        <option value="">Sans catégorie</option>
                         {categories
                           .filter((category) => category.type === "expense")
                           .map((category) => (
@@ -709,8 +804,8 @@ export function TransactionImport({
                         disabled={commitmentSaving}
                       >
                         {commitmentSaving
-                          ? "Creation..."
-                          : "Creer l engagement"}
+                          ? "Création..."
+                          : "Créer l’engagement"}
                       </button>
                     </div>
                   )}
@@ -726,7 +821,7 @@ export function TransactionImport({
                   >
                     {assistantLoading
                       ? "Analyse en cours..."
-                      : "Ameliorer avec l assistant"}
+                      : "Améliorer avec l’assistant"}
                   </button>
                   <div className="import-preview">
                     {preview.valid.map((transaction, index) => {

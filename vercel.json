@@ -1,6 +1,17 @@
 {
-  "routes": [
-    { "handle": "filesystem" },
-    { "src": "/(.*)", "dest": "/index.html" }
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "Content-Security-Policy", "value": "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'; object-src 'none'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; connect-src 'self' https://*.neonauth.c-14.us-east-1.aws.neon.tech https://*.apirest.c-14.us-east-1.aws.neon.tech; worker-src 'self' blob:; manifest-src 'self'" },
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+        { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=(), payment=(), usb=()" }
+      ]
+    }
+  ],
+  "rewrites": [
+    { "source": "/neon-auth/:path*", "destination": "/api/neon-auth?path=:path*" },
+    { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

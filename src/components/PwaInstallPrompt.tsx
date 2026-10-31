@@ -61,11 +61,11 @@ export function PwaInstallPrompt() {
       <div className="pwa-install-copy">
         <strong>Installer Horizon</strong>
         {mode === 'ios'
-          ? <span>Dans Safari, touchez <Share size={15} aria-hidden="true" /> puis « Sur l’ecran d’accueil ».</span>
-          : <span>Accedez a votre budget plus rapidement, meme hors ligne.</span>}
+          ? <span>Dans Safari, touchez <Share size={15} aria-hidden="true" /> puis « Sur l’écran d’accueil ».</span>
+          : <span>Accédez à votre budget plus rapidement, même hors ligne.</span>}
       </div>
       {mode === 'browser' && <button className="pwa-install-action" type="button" onClick={() => void install()}><Download size={17} aria-hidden="true" /> Installer</button>}
-      <button className="pwa-install-close" type="button" onClick={dismiss} aria-label="Fermer la proposition d installation"><X size={18} aria-hidden="true" /></button>
+      <button className="pwa-install-close" type="button" onClick={dismiss} aria-label="Fermer la proposition d’installation"><X size={18} aria-hidden="true" /></button>
     </aside>
   )
 }

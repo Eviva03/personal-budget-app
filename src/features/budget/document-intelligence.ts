@@ -28,25 +28,25 @@ function amountAfter(label: string, text: string) {
 
 function invoiceDescription(text: string) {
   const supplier = text.split(/\r?\n/).map((line) => line.trim()).find((line) => line.length >= 3 && line.length <= 80 && !/(facture|date|total|tva|client|adresse|siret)/i.test(line))
-  return supplier ?? 'Facture importee'
+  return supplier ?? 'Facture importée'
 }
 
 export function analyzeDocumentText(text: string, transactions: NewTransaction[]): DocumentAnalysis {
   const compact = normalized(text)
   if (transactions.length > 0 || /transactions du compte|solde d.?ouverture|argent sortant|argent entrant|releve|\bstatement\b|balance summary|opening balance|money out|money in|closing balance/.test(compact)) {
-    return { kind: 'bank_statement', confidence: transactions.length > 0 ? 'high' : 'medium', explanation: transactions.length > 0 ? `${transactions.length} transaction(s) detectee(s) dans le releve.` : 'Le document ressemble a un releve bancaire.', invoice: null }
+    return { kind: 'bank_statement', confidence: transactions.length > 0 ? 'high' : 'medium', explanation: transactions.length > 0 ? `${transactions.length} transaction(s) détectée(s) dans le relevé.` : 'Le document ressemble à un relevé bancaire.', invoice: null }
   }
 
   const amount = amountAfter('(?:total\\s*(?:ttc|a payer)?|montant\\s*(?:total|du)?)', text)
   const dueDateMatch = text.match(/(?:date d.?echeance|echeance|a regler avant|a payer avant)\D{0,30}(\d{2}[./-]\d{2}[./-]\d{4}|\d{4}-\d{2}-\d{2})/i)
   const dueDate = dueDateMatch ? parseDate(dueDateMatch[1]) : null
   if (/facture|invoice|montant\s*(?:total|du)|total\s*(?:ttc|a payer)/.test(compact)) {
-    return { kind: 'invoice', confidence: amount === null ? 'medium' : 'high', explanation: amount === null ? 'Facture detectee, total a verifier.' : 'Facture detectee avec un total a verifier.', invoice: { description: invoiceDescription(text), dueDate, amount } }
+    return { kind: 'invoice', confidence: amount === null ? 'medium' : 'high', explanation: amount === null ? 'Facture détectée, total à vérifier.' : 'Facture détectée avec un total à vérifier.', invoice: { description: invoiceDescription(text), dueDate, amount } }
   }
 
   if (/ticket|recu|receipt|tva|total/.test(compact)) {
-    return { kind: 'receipt', confidence: 'low', explanation: 'Ticket ou recu detecte. Verifiez la date et le total avant import.', invoice: { description: invoiceDescription(text), dueDate: null, amount: amountAfter('total', text) } }
+    return { kind: 'receipt', confidence: 'low', explanation: 'Ticket ou reçu détecté. Vérifiez la date et le total avant l’import.', invoice: { description: invoiceDescription(text), dueDate: null, amount: amountAfter('total', text) } }
   }
 
-  return { kind: 'unknown', confidence: 'low', explanation: 'Type de document inconnu. L assistant peut proposer une interpretation apres validation.', invoice: null }
+  return { kind: 'unknown', confidence: 'low', explanation: 'Type de document inconnu. L’assistant peut proposer une interprétation après validation.', invoice: null }
 }

@@ -7,6 +7,7 @@ import { VitePWA } from 'vite-plugin-pwa'
 export default defineConfig({
   plugins: [react(), tailwindcss(), VitePWA({
     registerType: 'autoUpdate',
+    selfDestroying: true,
     manifest: {
       name: 'Horizon',
       short_name: 'Horizon',

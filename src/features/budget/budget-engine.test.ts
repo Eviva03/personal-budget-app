@@ -7,7 +7,18 @@ const commitment = (amount: number, frequency: Commitment['frequency'], due_date
 
 describe('calculateBudget', () => {
   it('calculates realised expenses, normalized commitments, reserve, and free remainder', () => {
-    expect(calculateBudget({ monthlyIncome: 2000, reserve: 250, transactions: [transaction(100, '2026-10-02'), transaction(30, '2026-09-30')], commitments: [commitment(24, 'monthly'), commitment(52, 'weekly'), commitment(1200, 'yearly'), commitment(100, 'once')], referenceDate: new Date('2026-10-27') })).toEqual({ realisedExpenses: 100, projectedCommitments: 449.33, projectedRemainder: 1450.67, reserve: 250, freeRemainder: 1200.67 })
+    expect(calculateBudget({ monthlyIncome: 2000, reserve: 250, transactions: [transaction(100, '2026-10-02'), transaction(30, '2026-09-30')], commitments: [commitment(24, 'monthly'), commitment(52, 'weekly'), commitment(1200, 'yearly'), commitment(100, 'once')], referenceDate: new Date('2026-10-27') })).toEqual({ monthlyIncome: 2000, additionalIncome: 0, totalIncome: 2000, realisedExpenses: 100, projectedCommitments: 449.33, projectedRemainder: 1450.67, reserve: 250, freeRemainder: 1200.67 })
+  })
+
+  it('adds income transactions only to the month in which they occur', () => {
+    const incomeCategory = { id: 'income', user_id: 'u', name: 'Revenus ponctuels', color: '#000000', type: 'income' as const, created_at: '' }
+    const bonus = { ...transaction(300, '2026-10-18'), id: 'bonus', category_id: incomeCategory.id, description: 'Prime' }
+    expect(calculateBudget({ monthlyIncome: 2000, reserve: 250, transactions: [transaction(100, '2026-10-02'), bonus, { ...bonus, id: 'past', occurred_at: '2026-09-18' }], commitments: [], categories: [incomeCategory], referenceDate: new Date('2026-10-27') })).toMatchObject({ additionalIncome: 300, totalIncome: 2300, realisedExpenses: 100, projectedRemainder: 2200, freeRemainder: 1950 })
+  })
+
+  it('uses an explicit income direction even before a category is assigned', () => {
+    const income = { ...transaction(75, '2026-10-18'), id: 'gift', direction: 'income' as const, description: 'Don' }
+    expect(calculateBudget({ monthlyIncome: 2000, reserve: 0, transactions: [income], commitments: [], referenceDate: new Date('2026-10-27') })).toMatchObject({ additionalIncome: 75, realisedExpenses: 0, totalIncome: 2075 })
   })
 
   it('excludes paused and past one-off commitments', () => {
