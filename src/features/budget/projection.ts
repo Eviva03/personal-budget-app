@@ -1,5 +1,6 @@
 import type { Commitment, Transaction } from './types'
 import { isCommitmentFinished } from './budget-engine'
+import { addMonthsClamped } from './dates'
 
 export type UpcomingCommitment = Commitment & { nextDueDate: string }
 export type SpendingPoint = { label: string; amount: number }
@@ -19,10 +20,12 @@ function nextOccurrence(commitment: Commitment, referenceDate: Date) {
   const due = localDate(commitment.due_date)
   if (commitment.frequency === 'once') return due >= referenceDate ? due : null
   const next = new Date(due)
-  while (next < referenceDate) {
+  // Recompute from the first due date each time so a 31st never drifts into the next month.
+  for (let step = 1; next < referenceDate; step++) {
     if (commitment.frequency === 'weekly') next.setDate(next.getDate() + 7)
-    if (commitment.frequency === 'monthly') next.setMonth(next.getMonth() + 1)
-    if (commitment.frequency === 'yearly') next.setFullYear(next.getFullYear() + 1)
+    else if (commitment.frequency === 'monthly') next.setTime(addMonthsClamped(due, step).getTime())
+    else if (commitment.frequency === 'yearly') next.setTime(addMonthsClamped(due, step * 12).getTime())
+    else break
   }
   return next
 }

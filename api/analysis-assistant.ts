@@ -4,15 +4,15 @@ type ApiRequest = { method?: string; headers: { authorization?: string | string[
 type ApiResponse = { status: (status: number) => ApiResponse; json: (body: unknown) => void }
 type Insight = { summary: string; risks: string[]; anomalies: string[]; recommendations: string[] }
 type Category = { id: string; name: string; type: 'income' | 'expense' }
-type Transaction = { amount: number; occurred_at: string; category_id: string | null }
-type Commitment = { amount: number; description: string; due_date: string; frequency: 'once' | 'weekly' | 'monthly' | 'yearly'; status: 'active' | 'paused' | 'completed' }
+type Transaction = { amount: number; occurred_at: string; category_id: string | null; direction?: 'income' | 'expense' | null; review_status?: string | null }
+type Commitment = { amount: number; description: string; due_date: string; frequency: 'once' | 'weekly' | 'monthly' | 'yearly'; status: 'active' | 'paused' | 'completed'; installment_count?: number | null }
 
 function send(response: ApiResponse, body: unknown, status = 200) {
   response.status(status).json(body)
 }
 
 function isoDate(date: Date) {
-  return date.toISOString().slice(0, 10)
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 }
 
 function rounded(amount: number) {
@@ -20,17 +20,29 @@ function rounded(amount: number) {
 }
 
 function nextPayday(paydayDay: number, today: Date) {
+  const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate())
   const payday = new Date(today.getFullYear(), today.getMonth(), paydayDay)
-  if (payday < today) payday.setMonth(payday.getMonth() + 1)
+  if (payday < startOfToday) payday.setMonth(payday.getMonth() + 1)
   return payday
 }
 
+function addMonthsClamped(date: Date, months: number) {
+  const target = new Date(date.getFullYear(), date.getMonth() + months, 1)
+  target.setDate(Math.min(date.getDate(), new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate()))
+  return target
+}
+
 function nextCommitmentDate(commitment: Commitment, today: Date) {
-  const date = new Date(`${commitment.due_date}T00:00:00`)
-  if (commitment.frequency === 'once') return date >= today ? date : null
-  if (commitment.frequency === 'weekly') while (date < today) date.setDate(date.getDate() + 7)
-  if (commitment.frequency === 'monthly') while (date < today) date.setMonth(date.getMonth() + 1)
-  if (commitment.frequency === 'yearly') while (date < today) date.setFullYear(date.getFullYear() + 1)
+  const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+  const first = new Date(`${commitment.due_date}T00:00:00`)
+  if (commitment.frequency === 'once') return first >= startOfToday ? first : null
+  if (commitment.frequency === 'monthly' && commitment.installment_count && addMonthsClamped(first, commitment.installment_count - 1) < startOfToday) return null
+  const date = new Date(first)
+  for (let step = 1; date < startOfToday; step++) {
+    if (commitment.frequency === 'weekly') date.setDate(date.getDate() + 7)
+    else if (commitment.frequency === 'monthly') date.setTime(addMonthsClamped(first, step).getTime())
+    else date.setTime(addMonthsClamped(first, step * 12).getTime())
+  }
   return date
 }
 
@@ -101,8 +113,8 @@ export default async function handler(request: ApiRequest, response: ApiResponse
   const [{ data: settings, error: settingsError }, { data: categories, error: categoriesError }, { data: transactions, error: transactionsError }, { data: commitments, error: commitmentsError }] = await Promise.all([
     neon.from('budget_settings').select('monthly_income, reserve_amount, payday_day, budget_currency').maybeSingle(),
     neon.from('categories').select('id, name, type'),
-    neon.from('transactions').select('amount, occurred_at, category_id').gte('occurred_at', isoDate(monthStart)),
-    neon.from('commitments').select('amount, description, due_date, frequency, status'),
+    neon.from('transactions').select('amount, occurred_at, category_id, direction, review_status').gte('occurred_at', isoDate(monthStart)),
+    neon.from('commitments').select('amount, description, due_date, frequency, status, installment_count'),
   ])
   if (settingsError || categoriesError || transactionsError || commitmentsError) return send(response, { error: 'Impossible de charger les données budgétaires.' }, 500)
   if (!settings) return send(response, { error: 'Configurez votre budget avant cette analyse.' }, 400)
@@ -112,18 +124,19 @@ export default async function handler(request: ApiRequest, response: ApiResponse
   if (!allowance?.allowed) return send(response, { error: allowance?.reason === 'global_limit' ? 'Le budget mensuel de l’assistant est atteint.' : 'Votre quota mensuel pour l’assistant est atteint.' }, 429)
 
   const typedCategories = (categories ?? []) as Category[]
-  const typedTransactions = (transactions ?? []) as Transaction[]
+  const typedTransactions = ((transactions ?? []) as Transaction[]).filter((transaction) => transaction.review_status !== 'ignored')
   const typedCommitments = (commitments ?? []) as Commitment[]
   const categoryById = new Map(typedCategories.map((category) => [category.id, category]))
+  const isIncome = (transaction: Transaction) => transaction.direction === 'income' || (!transaction.direction && categoryById.get(transaction.category_id ?? '')?.type === 'income')
   const currentMonth = today.getMonth()
   const currentYear = today.getFullYear()
   const currentExpenses = typedTransactions.filter((transaction) => {
     const date = new Date(`${transaction.occurred_at}T00:00:00`)
-    return date.getFullYear() === currentYear && date.getMonth() === currentMonth && categoryById.get(transaction.category_id ?? '')?.type !== 'income'
+    return date.getFullYear() === currentYear && date.getMonth() === currentMonth && !isIncome(transaction)
   })
   const currentIncome = typedTransactions.filter((transaction) => {
     const date = new Date(`${transaction.occurred_at}T00:00:00`)
-    return date.getFullYear() === currentYear && date.getMonth() === currentMonth && categoryById.get(transaction.category_id ?? '')?.type === 'income'
+    return date.getFullYear() === currentYear && date.getMonth() === currentMonth && isIncome(transaction)
   })
   const categorySpending = typedCategories.filter((category) => category.type === 'expense').map((category) => {
     const amounts = typedTransactions.filter((transaction) => transaction.category_id === category.id)

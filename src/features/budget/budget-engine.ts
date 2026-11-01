@@ -1,3 +1,4 @@
+import { addMonthsClamped } from './dates'
 import type { Category, Commitment, Transaction } from './types'
 
 type EngineInput = {
@@ -35,14 +36,19 @@ export function isCommitmentDueInMonth(commitment: Commitment, referenceDate: Da
 export function isCommitmentFinished(commitment: Commitment, referenceDate = new Date()) {
   if (commitment.frequency !== 'monthly' || !commitment.installment_count) return false
   const firstDueDate = new Date(`${commitment.due_date}T00:00:00`)
-  const finalDueDate = new Date(firstDueDate)
-  finalDueDate.setMonth(finalDueDate.getMonth() + commitment.installment_count - 1)
+  const finalDueDate = addMonthsClamped(firstDueDate, commitment.installment_count - 1)
   const today = new Date(referenceDate.getFullYear(), referenceDate.getMonth(), referenceDate.getDate())
   return today > finalDueDate
 }
 
+function startsAfterMonth(commitment: Commitment, referenceDate: Date) {
+  const first = new Date(`${commitment.due_date}T00:00:00`)
+  return first.getFullYear() * 12 + first.getMonth() > referenceDate.getFullYear() * 12 + referenceDate.getMonth()
+}
+
 function monthlyCommitmentAmount(commitment: Commitment, referenceDate: Date) {
   if (commitment.status !== 'active') return 0
+  if (commitment.frequency !== 'once' && startsAfterMonth(commitment, referenceDate)) return 0
   if (!isCommitmentDueInMonth(commitment, referenceDate)) return 0
   if (commitment.frequency === 'weekly') return commitment.amount * 52 / 12
   if (commitment.frequency === 'monthly') return commitment.amount
@@ -54,7 +60,7 @@ function round(amount: number) { return Math.round(amount * 100) / 100 }
 
 export function calculateBudget({ monthlyIncome, reserve, transactions, commitments, categories = [], referenceDate = new Date() }: EngineInput): BudgetSummary {
   const incomeCategoryIds = new Set(categories.filter((category) => category.type === 'income').map((category) => category.id))
-  const monthlyTransactions = transactions.filter((transaction) => isInMonth(transaction.occurred_at, referenceDate))
+  const monthlyTransactions = transactions.filter((transaction) => transaction.review_status !== 'ignored' && isInMonth(transaction.occurred_at, referenceDate))
   const isIncome = (transaction: Transaction) => transaction.direction === 'income' || (!transaction.direction && incomeCategoryIds.has(transaction.category_id ?? ''))
   const additionalIncome = monthlyTransactions.filter(isIncome).reduce((sum, transaction) => sum + transaction.amount, 0)
   const realisedExpenses = monthlyTransactions.filter((transaction) => !isIncome(transaction)).reduce((sum, transaction) => sum + transaction.amount, 0)

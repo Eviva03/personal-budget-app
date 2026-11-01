@@ -177,7 +177,7 @@
 
 .global-add:hover {
   transform: translateY(-4px);
-  box-shadow: 0 16px 32px rgb(99 102 241 / 0.4);
+  box-shadow: 0 16px 32px rgb(56 124 112 / 0.4);
 }
 
 .global-add:active {
@@ -306,5 +306,51 @@
   .global-add svg {
     width: 20px;
     height: 20px;
+  }
+}
+
+.app-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 100svh;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+.app-loading .spinner {
+  width: 22px;
+  height: 22px;
+}
+
+/* Fade edges hint that more tabs are hidden off-screen in the mobile nav. */
+@media (max-width: 768px) {
+  .mobile-navigation {
+    scroll-padding-inline: 12px;
+  }
+  .mobile-navigation::before,
+  .mobile-navigation::after {
+    content: "";
+    position: sticky;
+    z-index: 1;
+    flex: 0 0 28px;
+    align-self: stretch;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  .mobile-navigation::before {
+    left: 0;
+    margin-right: -32px;
+    background: linear-gradient(to right, #1a2332, rgba(26, 35, 50, 0));
+  }
+  .mobile-navigation::after {
+    right: 0;
+    margin-left: -32px;
+    background: linear-gradient(to left, #1a2332, rgba(26, 35, 50, 0));
+  }
+  .mobile-navigation.has-left::before,
+  .mobile-navigation.has-right::after {
+    opacity: 1;
   }
 }

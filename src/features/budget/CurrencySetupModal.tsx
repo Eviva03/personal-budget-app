@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { DialogBehavior } from '../../components/DialogBehavior'
 import { saveBudgetSettings } from './budget-repository'
 import type { BudgetCurrency } from './money'
 
@@ -35,6 +36,7 @@ export function CurrencySetupModal({ userId, onComplete }: CurrencySetupModalPro
 
   return <div className="currency-setup-backdrop" role="presentation">
     <section className="currency-setup-modal" role="dialog" aria-modal="true" aria-labelledby="currency-setup-title">
+      <DialogBehavior />
       <p className="eyebrow">PREMIÈRE CONFIGURATION</p>
       <h2 id="currency-setup-title">Dans quelle devise tenez-vous votre budget ?</h2>
       <p>Cette devise servira à enregistrer vos revenus, dépenses et engagements. Elle ne pourra plus être modifiée ensuite.</p>

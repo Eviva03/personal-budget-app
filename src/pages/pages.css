@@ -174,7 +174,7 @@ h1 {
 .auth-form input:focus {
   outline: none;
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgb(99 102 241 / 0.1);
+  box-shadow: 0 0 0 3px rgb(56 124 112 / 0.1);
   background: var(--bg-primary);
 }
 
@@ -194,12 +194,12 @@ h1 {
   font-size: 14px;
   cursor: pointer;
   transition: var(--transition);
-  box-shadow: 0 4px 12px rgb(99 102 241 / 0.3);
+  box-shadow: 0 4px 12px rgb(56 124 112 / 0.3);
 }
 
 .primary-button:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 8px 16px rgb(99 102 241 / 0.4);
+  box-shadow: 0 8px 16px rgb(56 124 112 / 0.4);
 }
 
 .primary-button:active:not(:disabled) {
@@ -294,7 +294,7 @@ h1 {
 .transaction-filters select:focus {
   outline: none;
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgb(99 102 241 / 0.1);
+  box-shadow: 0 0 0 3px rgb(56 124 112 / 0.1);
 }
 
 .filter-action {
@@ -771,7 +771,7 @@ h1 {
 }
 
 .currency-choice:has(input:checked) {
-  background: rgb(99 102 241 / 0.1);
+  background: rgb(56 124 112 / 0.1);
   border-color: var(--primary);
 }
 
@@ -948,7 +948,7 @@ h1 {
 .import-row input:focus {
   outline: none;
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgb(99 102 241 / 0.1);
+  box-shadow: 0 0 0 3px rgb(56 124 112 / 0.1);
 }
 
 .import-suggestion {
@@ -1036,7 +1036,7 @@ h1 {
   margin: 0;
   padding: 10px 12px;
   color: var(--text-secondary);
-  background: rgb(99 102 241 / 0.05);
+  background: rgb(56 124 112 / 0.05);
   border-left: 3px solid var(--primary);
   border-radius: 0 4px 4px 0;
   font-size: 13px;
@@ -1220,7 +1220,7 @@ h1 {
 .entry-form select:focus {
   outline: none;
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgb(99 102 241 / 0.1);
+  box-shadow: 0 0 0 3px rgb(56 124 112 / 0.1);
 }
 
 .entry-type {
@@ -1336,14 +1336,14 @@ h1 {
 .goal-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-top: 20px; }
 .goal-card { display: grid; gap: 14px; padding: 18px; border: 1px solid #deded5; border-radius: 8px; background: #fffdf8; }
 .goal-card > div:first-child, .goal-card footer { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
-.goal-card strong { color: #18382e; font-family: Fraunces, serif; font-size: 21px; }
+.goal-card strong { color: #18382e; font-family: 'Sora', sans-serif; font-size: 21px; }
 .goal-card span { color: #526359; font-size: 13px; }
 .goal-progress { height: 9px; overflow: hidden; border-radius: 5px; background: #e8eee8; }
 .goal-progress span { display: block; height: 100%; background: #4a9b7d; }
 .goal-card footer b { color: #28644f; }
 .payday-forecast { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(220px, .8fr); gap: 24px; margin-top: 20px; padding: 22px; border: 1px solid #bdd6c4; border-radius: 8px; background: #edf4ee; }
 .payday-forecast .eyebrow { margin-bottom: 10px; }
-.payday-forecast h2 { margin: 0; color: #18382e; font-family: Fraunces, serif; font-size: 32px; }
+.payday-forecast h2 { margin: 0; color: #18382e; font-family: 'Sora', sans-serif; font-size: 32px; }
 .payday-forecast p:not(.eyebrow) { margin: 8px 0 0; color: #526359; line-height: 1.5; }
 .forecast-commitments { display: grid; align-content: start; gap: 6px; padding-left: 20px; border-left: 1px solid #bdd6c4; color: #18382e; }
 .forecast-commitments span { color: #526359; font-size: 13px; }
@@ -1365,7 +1365,7 @@ h1 {
 .currency-settings h2 {
   margin: 0 0 4px;
   color: #18382e;
-  font-family: Fraunces, serif;
+  font-family: 'Sora', sans-serif;
   font-size: 24px;
 }
 .currency-settings label {
@@ -1413,7 +1413,7 @@ h1 {
 .currency-setup-modal .eyebrow { margin-bottom: 12px; }
 .currency-setup-modal h2 {
   color: #18382e;
-  font-family: Fraunces, serif;
+  font-family: 'Sora', sans-serif;
   font-size: 31px;
   line-height: 1.08;
 }
@@ -1685,7 +1685,7 @@ h1 {
 .entry-modal h2 {
   margin: 0 0 24px;
   color: #18382e;
-  font-family: Fraunces, serif;
+  font-family: 'Sora', sans-serif;
   font-size: 34px;
 }
 .icon-button {
@@ -1799,7 +1799,7 @@ h1 {
 .summary-card strong {
   margin: auto 0 6px;
   color: #18382e;
-  font-family: Fraunces, serif;
+  font-family: 'Sora', sans-serif;
   font-size: 25px;
 }
 .summary-card small {
@@ -1940,7 +1940,7 @@ h1 {
 .analysis-assistant h2 {
   margin: 0;
   color: #18212b;
-  font-family: Fraunces, serif;
+  font-family: 'Sora', sans-serif;
   font-size: 24px;
   font-weight: 600;
 }
@@ -2053,7 +2053,7 @@ h1 {
 .chart-title {
   display: block;
   color: #18382e;
-  font-family: Fraunces, serif;
+  font-family: 'Sora', sans-serif;
   font-size: 31px;
 }
 .panel-subtitle {
@@ -2174,7 +2174,7 @@ h1,
 .payday-date,
 .chart-title {
   color: #18212b;
-  font-family: Unbounded, sans-serif;
+  font-family: 'Sora', sans-serif;
   font-weight: 600;
 }
 h1 {
@@ -2663,7 +2663,7 @@ select:focus-visible {
   color: #387c70;
 }
 .discover-step h2 {
-  font-family: Unbounded, sans-serif;
+  font-family: 'Sora', sans-serif;
   font-size: 18px;
   line-height: 1.3;
 }
@@ -2728,4 +2728,52 @@ select:focus-visible {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* Modals: scroll inside the viewport and stay above the fixed mobile nav and + button. */
+.modal-backdrop,
+.currency-setup-backdrop {
+  z-index: 100;
+  display: flex;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+}
+.entry-modal,
+.currency-setup-modal {
+  margin: auto;
+  max-width: 100%;
+}
+.entry-form > .primary-button:last-child {
+  position: sticky;
+  bottom: 4px;
+  z-index: 1;
+}
+@media (max-width: 480px) {
+  .entry-modal,
+  .currency-setup-modal {
+    padding: 22px 18px;
+  }
+  .entry-modal h2 {
+    font-size: 26px;
+  }
+}
+
+@media (pointer: coarse) {
+  .row-actions .icon-button {
+    width: 40px;
+    height: 40px;
+  }
+  .page-placeholder a:not(.primary-button):not(.secondary-button) {
+    display: inline-block;
+    padding: 10px 0;
+  }
+}
+
+.app-loading-inline {
+  min-height: 40svh;
+}
+.entry-modal:focus,
+.currency-setup-modal:focus {
+  outline: none;
 }

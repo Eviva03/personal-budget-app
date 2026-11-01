@@ -16,6 +16,11 @@ describe('projection helpers', () => {
     const phone = { ...commitment('monthly', '2026-07-29'), installment_count: 4 }
     expect(commitmentsUntilPayday([phone], 28, new Date('2026-10-30'))).toEqual([])
   })
+  it('keeps a monthly commitment on the 31st on the last day of shorter months', () => {
+    const rent = commitment('monthly', '2026-10-31')
+    expect(commitmentsUntilPayday([rent], 28, new Date('2026-11-29')).map((item) => item.nextDueDate)).toEqual(['2026-11-30'])
+    expect(commitmentsUntilPayday([rent], 28, new Date('2027-02-10')).map((item) => item.nextDueDate)).toEqual(['2027-02-28'])
+  })
   it('groups current-month transactions by day', () => expect(spendingByDay([transaction(10, '2026-10-02'), transaction(5, '2026-10-02'), transaction(9, '2026-09-30')], new Date('2026-10-27'))).toEqual([{ label: '2 oct.', amount: 15 }]))
   it('turns the commitment-adjusted free balance into a daily allowance', () => {
     const forecast = forecastUntilPayday(90, [commitment('monthly', '2026-10-28')], 5, new Date('2026-10-27'))

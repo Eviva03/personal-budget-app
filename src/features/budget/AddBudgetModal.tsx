@@ -5,6 +5,8 @@ import {
   createTransaction,
   listCategories,
 } from "./budget-repository";
+import { todayIso } from "./dates";
+import { DialogBehavior } from "../../components/DialogBehavior";
 import { convertAmount, parseAmount } from "./money";
 import type { Category } from "./types";
 import { useCurrency } from "./CurrencyProvider";
@@ -22,8 +24,6 @@ type DatabaseError = {
   code?: unknown;
 };
 
-const today = new Date().toISOString().slice(0, 10);
-
 export function AddBudgetModal({
   userId,
   onClose,
@@ -33,7 +33,7 @@ export function AddBudgetModal({
   const [entryType, setEntryType] = useState<EntryType>("transaction");
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
-  const [date, setDate] = useState(today);
+  const [date, setDate] = useState(todayIso);
   const [frequency, setFrequency] = useState("once");
   const [installmentCount, setInstallmentCount] = useState("");
   const [categories, setCategories] = useState<Category[]>([]);
@@ -49,10 +49,8 @@ export function AddBudgetModal({
 
   function chooseEntryType(nextType: EntryType) {
     setEntryType(nextType);
-    const categoryType = nextType === "income" ? "income" : "expense";
-    const selectedCategory = categories.find(
-      (category) => category.type === categoryType,
-    );
+    // Income needs a category; expenses and commitments stay uncategorised until the user picks one.
+    const selectedCategory = nextType === "income" ? categories.find((category) => category.type === "income") : undefined;
     setCategoryId(selectedCategory?.id ?? "");
   }
 
@@ -122,6 +120,7 @@ export function AddBudgetModal({
         aria-modal="true"
         aria-labelledby="entry-title"
       >
+        <DialogBehavior onClose={onClose} />
         <button
           className="icon-button"
           type="button"

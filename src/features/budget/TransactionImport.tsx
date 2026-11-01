@@ -1,5 +1,6 @@
 import { FileText, Upload, X } from "lucide-react";
 import { useState, type ChangeEvent } from "react";
+import { todayIso } from "./dates";
 import {
   createImportJournalEntry,
   createCommitment,
@@ -58,8 +59,6 @@ type DocumentAssistantProposal = {
     categoryId: string | null;
   }>;
 };
-const today = new Date().toISOString().slice(0, 10);
-
 export function TransactionImport({
   userId,
   onImported,
@@ -148,7 +147,7 @@ export function TransactionImport({
         const draft: NewTransaction = {
           description: receipt.description,
           amount: receipt.amount,
-          occurred_at: today,
+          occurred_at: todayIso(),
           category_id: null,
         };
         setTransactionDraft({
@@ -382,7 +381,7 @@ export function TransactionImport({
           ? {
               description: body.proposal.description,
               amount: body.proposal.amount,
-              occurred_at: today,
+              occurred_at: todayIso(),
               category_id: body.proposal.categoryId,
             }
           : null,

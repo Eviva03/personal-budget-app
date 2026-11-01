@@ -1,6 +1,7 @@
 import { Check, Download, Pencil, Trash2, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAuth } from "../features/auth/useAuth";
+import { DialogBehavior } from "../components/DialogBehavior";
 import { CategoryIcon } from "../features/budget/category-icon";
 import {
   deleteTransaction,
@@ -38,6 +39,7 @@ export function TransactionsPage() {
   const [items, setItems] = useState<Transaction[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [error, setError] = useState("");
+  const [actionError, setActionError] = useState("");
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [from, setFrom] = useState("");
@@ -124,7 +126,7 @@ export function TransactionsPage() {
       setEditing(null);
       window.dispatchEvent(new Event("budget-data-changed"));
     } catch (requestError) {
-      setError(
+      setActionError(
         requestError instanceof Error
           ? requestError.message
           : "Impossible de modifier la transaction.",
@@ -141,7 +143,7 @@ export function TransactionsPage() {
       setItems((current) => current.filter((entry) => entry.id !== item.id));
       window.dispatchEvent(new Event("budget-data-changed"));
     } catch (requestError) {
-      setError(
+      setActionError(
         requestError instanceof Error
           ? requestError.message
           : "Impossible de supprimer la transaction.",
@@ -156,7 +158,7 @@ export function TransactionsPage() {
       setItems((current) => current.map((entry) => entry.id === item.id ? { ...entry, review_status: status } : entry));
       window.dispatchEvent(new Event("budget-data-changed"));
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Impossible de mettre à jour le rapprochement.");
+      setActionError(requestError instanceof Error ? requestError.message : "Impossible de mettre à jour le rapprochement.");
     }
   }
 
@@ -342,6 +344,7 @@ export function TransactionsPage() {
           )}
         </>
       )}
+      {actionError && <p className="form-message" role="alert">{actionError}</p>}
       {editing && (
         <div
           className="modal-backdrop"
@@ -354,6 +357,7 @@ export function TransactionsPage() {
             aria-modal="true"
             aria-labelledby="edit-transaction-title"
           >
+            <DialogBehavior onClose={() => setEditing(null)} />
             <button
               className="icon-button"
               type="button"

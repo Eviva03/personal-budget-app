@@ -2,11 +2,10 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { useAuth } from '../features/auth/useAuth'
 import { createGoalAllocation, createSavingsGoal, listCategories, listGoalAllocations, listSavingsGoals, listTransactions } from '../features/budget/budget-repository'
 import { useCurrency } from '../features/budget/CurrencyProvider'
+import { todayIso } from '../features/budget/dates'
 import { convertAmount, parseAmount } from '../features/budget/money'
 import type { Category, GoalAllocation, SavingsGoal, Transaction } from '../features/budget/types'
 import './pages.css'
-
-const today = new Date().toISOString().slice(0, 10)
 
 export function GoalsPage() {
   const { user } = useAuth()
@@ -36,7 +35,7 @@ export function GoalsPage() {
       .catch((error: unknown) => setMessage(error instanceof Error ? error.message : 'Impossible de charger les objectifs.'))
   }, [user])
 
-  const incomeTransactions = transactions.filter((transaction) => transaction.direction === 'income' || (!transaction.direction && categories.find((category) => category.id === transaction.category_id)?.type === 'income'))
+  const incomeTransactions = transactions.filter((transaction) => transaction.review_status !== 'ignored' && (transaction.direction === 'income' || (!transaction.direction && categories.find((category) => category.id === transaction.category_id)?.type === 'income')))
   const allocatedForGoal = (id: string) => allocations.filter((allocation) => allocation.goal_id === id).reduce((sum, allocation) => sum + allocation.amount, 0)
   const allocatedForTransaction = (id: string) => allocations.filter((allocation) => allocation.transaction_id === id).reduce((sum, allocation) => sum + allocation.amount, 0)
 
@@ -63,7 +62,7 @@ export function GoalsPage() {
     if (!amount || !transaction || amount > transaction.amount - allocatedForTransaction(transaction.id)) { setMessage('Le montant depasse le revenu encore disponible pour cette affectation.'); return }
     setSaving(true); setMessage('')
     try {
-      const allocation = await createGoalAllocation(user.id, { goal_id: goalId, transaction_id: transactionId, amount, allocated_at: today })
+      const allocation = await createGoalAllocation(user.id, { goal_id: goalId, transaction_id: transactionId, amount, allocated_at: todayIso() })
       setAllocations((current) => [allocation, ...current])
       setAllocationAmount('')
       setMessage('Revenu affecté à l’objectif.')

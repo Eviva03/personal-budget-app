@@ -21,6 +21,11 @@ describe('calculateBudget', () => {
     expect(calculateBudget({ monthlyIncome: 2000, reserve: 0, transactions: [income], commitments: [], referenceDate: new Date('2026-10-27') })).toMatchObject({ additionalIncome: 75, realisedExpenses: 0, totalIncome: 2075 })
   })
 
+  it('ignores transactions the user marked as ignored', () => {
+    const ignored = { ...transaction(80, '2026-10-05'), id: 'ignored', review_status: 'ignored' as const }
+    expect(calculateBudget({ monthlyIncome: 1000, reserve: 0, transactions: [transaction(20, '2026-10-02'), ignored], commitments: [], referenceDate: new Date('2026-10-27') }).realisedExpenses).toBe(20)
+  })
+
   it('excludes paused and past one-off commitments', () => {
     const paused = { ...commitment(90, 'monthly'), status: 'paused' as const }
     expect(calculateBudget({ monthlyIncome: 500, reserve: 0, transactions: [], commitments: [paused, commitment(50, 'once', '2026-09-10')], referenceDate: new Date('2026-10-27') }).projectedCommitments).toBe(0)
@@ -30,6 +35,12 @@ describe('calculateBudget', () => {
     const installment = { ...commitment(100, 'monthly', '2026-11-05'), installment_count: 3 }
     expect(calculateBudget({ monthlyIncome: 1000, reserve: 0, transactions: [], commitments: [installment], referenceDate: new Date('2026-12-10') }).projectedCommitments).toBe(100)
     expect(calculateBudget({ monthlyIncome: 1000, reserve: 0, transactions: [], commitments: [installment], referenceDate: new Date('2027-02-10') }).projectedCommitments).toBe(0)
+  })
+
+  it('does not count a recurring commitment in months before its first due date', () => {
+    const gym = commitment(40, 'monthly', '2027-01-05')
+    expect(calculateBudget({ monthlyIncome: 1000, reserve: 0, transactions: [], commitments: [gym], referenceDate: new Date('2026-11-10') }).projectedCommitments).toBe(0)
+    expect(calculateBudget({ monthlyIncome: 1000, reserve: 0, transactions: [], commitments: [gym], referenceDate: new Date('2027-01-10') }).projectedCommitments).toBe(40)
   })
 
   it('keeps an August four-installment plan active through November', () => {

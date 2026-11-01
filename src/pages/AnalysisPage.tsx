@@ -75,15 +75,20 @@ export function AnalysisPage() {
         );
         const monthlyExpenses = transactions.filter(
           (transaction) =>
-            categoryById.get(transaction.category_id ?? "")?.type !== "income",
+            transaction.review_status !== "ignored" &&
+            transaction.direction !== "income" &&
+            (transaction.direction ||
+              categoryById.get(transaction.category_id ?? "")?.type !== "income"),
         );
         const nextPaydayDate = nextPayday(settings.payday_day);
         setPayday(nextPaydayDate);
+        const startOfToday = new Date();
+        startOfToday.setHours(0, 0, 0, 0);
         setDaysUntilPayday(
           Math.max(
             0,
-            Math.ceil(
-              (nextPaydayDate.getTime() - new Date().getTime()) / 86_400_000,
+            Math.round(
+              (nextPaydayDate.getTime() - startOfToday.getTime()) / 86_400_000,
             ),
           ),
         );
