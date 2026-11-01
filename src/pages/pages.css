@@ -1388,7 +1388,7 @@ h1 {
   line-height: 1.45;
 }
 .currency-settings select:disabled {
-  color: #637180;
+  color: #566474;
   background: #e8eee8;
   border-color: #d3ddd4;
   cursor: not-allowed;
@@ -1803,7 +1803,7 @@ h1 {
   font-size: 25px;
 }
 .summary-card small {
-  color: #6a796f;
+  color: #566559;
 }
 .summary-card.emphasis {
   background: #dcece1;
@@ -2015,7 +2015,7 @@ h1 {
 }
 .analysis-metric span {
   align-self: center;
-  color: #637180;
+  color: #566474;
   font-size: 12px;
   font-weight: 700;
 }
@@ -2058,7 +2058,7 @@ h1 {
 }
 .panel-subtitle {
   margin: 6px 0 19px;
-  color: #6a796f;
+  color: #566559;
 }
 .timeline {
   display: grid;
@@ -2085,7 +2085,7 @@ h1 {
   gap: 2px;
 }
 .timeline span {
-  color: #6a796f;
+  color: #566559;
   font-size: 12px;
 }
 .timeline b {
@@ -2093,7 +2093,7 @@ h1 {
 }
 .timeline-empty {
   display: block !important;
-  color: #6a796f;
+  color: #566559;
 }
 .spending-chart {
   height: 230px;
@@ -2104,7 +2104,7 @@ h1 {
 }
 .spending-chart > p {
   align-self: center;
-  color: #6a796f;
+  color: #566559;
 }
 .chart-column {
   flex: 1;
@@ -2128,7 +2128,7 @@ h1 {
 }
 .chart-column small {
   padding-top: 6px;
-  color: #6a796f;
+  color: #566559;
   font-size: 10px;
   white-space: nowrap;
 }
@@ -2183,7 +2183,7 @@ h1 {
   line-height: 1.08;
 }
 .description {
-  color: #637180;
+  color: #566474;
   font-size: 17px;
 }
 .placeholder-card,
@@ -2304,7 +2304,7 @@ h1 {
   background: #ffe4df;
 }
 .history-head {
-  color: #637180;
+  color: #566474;
   background: #e8f1f8;
 }
 .history-row strong,
@@ -2316,7 +2316,7 @@ h1 {
 .data-list span,
 .history-row,
 .form-message {
-  color: #637180;
+  color: #566474;
 }
 .category-name {
   grid-template-columns: 32px auto !important;
@@ -2376,7 +2376,7 @@ h1 {
 }
 .import-hint {
   margin: 0;
-  color: #637180;
+  color: #566474;
   font-size: 13px;
 }
 .commitment-import-preview {
@@ -2776,4 +2776,197 @@ select:focus-visible {
 .entry-modal:focus,
 .currency-setup-modal:focus {
   outline: none;
+}
+
+/* Text colours below keep at least 4.5:1 contrast on their backgrounds. */
+.eyebrow,
+.panel-label,
+.analysis-assistant-heading .panel-label {
+  color: #2a5d52;
+}
+.summary-card.free,
+.summary-card.free * {
+  color: #18212b;
+}
+/* Import preview rows: date | label | amount | direction | category | remove, stacked on phones. */
+.import-row {
+  grid-template-columns: 130px minmax(0, 1fr) 110px 112px minmax(130px, 0.7fr) 40px;
+  align-items: center;
+}
+.import-row input,
+.import-row select {
+  min-width: 0;
+  padding: 9px 10px;
+  color: #18212b;
+  background: #fff;
+  border: 1px solid #bec7be;
+  border-radius: 6px;
+  font-size: 13px;
+}
+.import-remove {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  color: #a94236;
+  background: #f9e3df;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.import-remove:hover {
+  background: #f3cdc6;
+}
+.import-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 4px 0 8px;
+  color: #3f4d44;
+  font-size: 13px;
+}
+@media (max-width: 800px) {
+  .import-row {
+    grid-template-columns: minmax(0, 1fr) 110px 40px;
+    grid-template-areas:
+      "label label label"
+      "date amount remove"
+      "direction category category";
+  }
+  .import-preview .import-row .import-field-label { grid-area: label; }
+  .import-preview .import-row .import-field-date { grid-area: date; }
+  .import-preview .import-row .import-field-amount { grid-area: amount; }
+  .import-preview .import-row .import-field-direction { grid-area: direction; }
+  .import-preview .import-row .import-field-category { grid-area: category; }
+  .import-preview .import-row .import-remove { grid-area: remove; }
+  .import-row {
+    padding-bottom: 10px;
+    border-bottom: 1px solid #e2e8f0;
+  }
+}
+
+/* Analysis page: assistant controls, saved answer, category breakdown, scrollable daily chart. */
+.analysis-assistant-actions {
+  display: grid;
+  justify-items: end;
+  gap: 6px;
+}
+.analysis-usage {
+  color: #566559;
+  font-size: 12px;
+}
+.analysis-insight-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+  color: #566559;
+  font-size: 12px;
+}
+.analysis-tone {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-weight: 700;
+}
+.analysis-tone-good { color: #1f5d4d; background: #dcefe9; }
+.analysis-tone-watch { color: #6b4a06; background: #fbe8b8; }
+.analysis-tone-alert { color: #8a2b1d; background: #ffe4df; }
+.spending-chart-scroll {
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+.spending-chart-scroll .spending-chart {
+  min-width: max-content;
+}
+.analysis-categories {
+  margin-top: 16px;
+}
+.category-spend {
+  display: grid;
+  gap: 14px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.category-spend li {
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+}
+.category-spend-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 4px;
+}
+.category-spend-main strong {
+  display: block;
+  margin-bottom: 6px;
+  color: #18212b;
+  font-size: 14px;
+}
+.category-spend-main small {
+  margin-left: 6px;
+  color: #566559;
+  font-weight: 500;
+}
+.category-spend-bar {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: #e8eee8;
+}
+.category-spend-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+}
+.category-spend-figures {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+  text-align: right;
+}
+.category-spend-figures b {
+  color: #18212b;
+  font-size: 14px;
+}
+.category-spend-figures small {
+  color: #566559;
+  font-size: 12px;
+}
+.category-spend-up { color: #a94236 !important; }
+.category-spend-down { color: #1f5d4d !important; }
+@media (max-width: 640px) {
+  .analysis-assistant-actions {
+    justify-items: stretch;
+  }
+  .category-spend li {
+    grid-template-columns: 12px minmax(0, 1fr);
+  }
+  .category-spend-figures {
+    grid-column: 2;
+    justify-items: start;
+    text-align: left;
+  }
+}
+
+.analysis-metric {
+  padding: 14px;
+}
+.analysis-metric span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.analysis-metric strong {
+  white-space: nowrap;
+  font-size: clamp(15px, 1.5vw, 18px);
+}
+
+.chart-column {
+  max-width: 72px;
+}
+.spending-chart {
+  justify-content: flex-start;
 }

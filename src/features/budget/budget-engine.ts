@@ -1,5 +1,5 @@
 import { addMonthsClamped } from './dates'
-import type { Category, Commitment, Transaction } from './types'
+import type { Category, Commitment, GoalAllocation, Transaction } from './types'
 
 type EngineInput = {
   monthlyIncome: number
@@ -7,6 +7,7 @@ type EngineInput = {
   transactions: Transaction[]
   commitments: Commitment[]
   categories?: Category[]
+  allocations?: GoalAllocation[]
   referenceDate?: Date
 }
 
@@ -16,6 +17,7 @@ export type BudgetSummary = {
   totalIncome: number
   realisedExpenses: number
   projectedCommitments: number
+  allocatedToGoals: number
   projectedRemainder: number
   reserve: number
   freeRemainder: number
@@ -58,7 +60,18 @@ function monthlyCommitmentAmount(commitment: Commitment, referenceDate: Date) {
 
 function round(amount: number) { return Math.round(amount * 100) / 100 }
 
-export function calculateBudget({ monthlyIncome, reserve, transactions, commitments, categories = [], referenceDate = new Date() }: EngineInput): BudgetSummary {
+// An allocation reserves part of an income, so it leaves the budget of the month that income was received
+// (or the allocation month once the income itself has been deleted).
+function allocatedInMonth(allocations: GoalAllocation[], transactions: Transaction[], referenceDate: Date) {
+  const byId = new Map(transactions.map((transaction) => [transaction.id, transaction]))
+  return allocations.reduce((sum, allocation) => {
+    const income = allocation.transaction_id ? byId.get(allocation.transaction_id) : undefined
+    if (income?.review_status === 'ignored') return sum
+    return isInMonth(income?.occurred_at ?? allocation.allocated_at, referenceDate) ? sum + allocation.amount : sum
+  }, 0)
+}
+
+export function calculateBudget({ monthlyIncome, reserve, transactions, commitments, categories = [], allocations = [], referenceDate = new Date() }: EngineInput): BudgetSummary {
   const incomeCategoryIds = new Set(categories.filter((category) => category.type === 'income').map((category) => category.id))
   const monthlyTransactions = transactions.filter((transaction) => transaction.review_status !== 'ignored' && isInMonth(transaction.occurred_at, referenceDate))
   const isIncome = (transaction: Transaction) => transaction.direction === 'income' || (!transaction.direction && incomeCategoryIds.has(transaction.category_id ?? ''))
@@ -66,6 +79,7 @@ export function calculateBudget({ monthlyIncome, reserve, transactions, commitme
   const realisedExpenses = monthlyTransactions.filter((transaction) => !isIncome(transaction)).reduce((sum, transaction) => sum + transaction.amount, 0)
   const projectedCommitments = commitments.reduce((sum, commitment) => sum + monthlyCommitmentAmount(commitment, referenceDate), 0)
   const totalIncome = monthlyIncome + additionalIncome
-  const projectedRemainder = totalIncome - realisedExpenses - projectedCommitments
-  return { monthlyIncome: round(monthlyIncome), additionalIncome: round(additionalIncome), totalIncome: round(totalIncome), realisedExpenses: round(realisedExpenses), projectedCommitments: round(projectedCommitments), projectedRemainder: round(projectedRemainder), reserve: round(reserve), freeRemainder: round(projectedRemainder - reserve) }
+  const allocatedToGoals = allocatedInMonth(allocations, transactions, referenceDate)
+  const projectedRemainder = totalIncome - realisedExpenses - projectedCommitments - allocatedToGoals
+  return { monthlyIncome: round(monthlyIncome), additionalIncome: round(additionalIncome), totalIncome: round(totalIncome), realisedExpenses: round(realisedExpenses), projectedCommitments: round(projectedCommitments), allocatedToGoals: round(allocatedToGoals), projectedRemainder: round(projectedRemainder), reserve: round(reserve), freeRemainder: round(projectedRemainder - reserve) }
 }

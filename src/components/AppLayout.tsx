@@ -23,6 +23,17 @@ export function AppLayout({ children }: AppLayoutProps) {
   const { pathname } = useLocation()
   const mobileNavRef = useRef<HTMLElement>(null)
   const [hiddenTabs, setHiddenTabs] = useState({ left: false, right: false })
+  const [online, setOnline] = useState(() => navigator.onLine)
+
+  useEffect(() => {
+    const update = () => setOnline(navigator.onLine)
+    window.addEventListener('online', update)
+    window.addEventListener('offline', update)
+    return () => {
+      window.removeEventListener('online', update)
+      window.removeEventListener('offline', update)
+    }
+  }, [])
 
   const updateHiddenTabs = useCallback(() => {
     const nav = mobileNavRef.current
@@ -65,7 +76,10 @@ export function AppLayout({ children }: AppLayoutProps) {
         </nav>
         <p className="sidebar-note">{user?.email ?? 'Votre espace de décision, en toute clarté.'}</p>
       </aside>
-      <main className="main-content">{children}</main>
+      <main className="main-content">
+        {!online && <p className="offline-notice" role="status">Vous êtes hors ligne : vos données ne peuvent pas être chargées ni enregistrées pour le moment.</p>}
+        {children}
+      </main>
       <nav ref={mobileNavRef} onScroll={updateHiddenTabs} className={`mobile-navigation${hiddenTabs.left ? ' has-left' : ''}${hiddenTabs.right ? ' has-right' : ''}`} aria-label="Navigation principale">
         {navigation.map(({ to, label, icon: Icon }) => (
           <NavLink key={to} to={to} end={to === '/'} className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>

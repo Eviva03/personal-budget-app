@@ -354,3 +354,13 @@
     opacity: 1;
   }
 }
+
+.offline-notice {
+  margin: 0 0 16px;
+  padding: 10px 14px;
+  border: 1px solid #e3b44a;
+  border-radius: 8px;
+  color: #18212b;
+  background: #fdf3d6;
+  font-size: 14px;
+}

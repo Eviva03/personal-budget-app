@@ -1,4 +1,5 @@
 import { createAuthenticatedNeonClient, hasAuthenticatedUser } from './neon.js'
+import { dailyWarningThresholdEur, generateContent, modelChain, quotaError } from './gemini.js'
 
 type CategoryInput = { id: string; name: string; type: 'income' | 'expense' }
 type ImportLine = { id: string; description: string; amount: number; occurredAt: string }
@@ -10,8 +11,7 @@ type AssistantSuggestion = {
   explanation: string
 }
 
-const maxLines = 10
-const fallbackModel = 'gemini-3.1-flash-lite'
+const maxLines = 25
 
 type ApiRequest = {
   method?: string
@@ -34,9 +34,21 @@ function isRequest(value: unknown): value is AssistantRequest {
   return Array.isArray(lines) && lines.length > 0 && lines.length <= maxLines && Array.isArray(categories) && categories.length > 0 && categories.length <= 50 && lines.every((line) => typeof line?.id === 'string' && typeof line.description === 'string' && line.description.length <= 200 && typeof line.amount === 'number' && Number.isFinite(line.amount) && typeof line.occurredAt === 'string') && categories.every((category) => typeof category?.id === 'string' && typeof category.name === 'string' && (category.type === 'income' || category.type === 'expense'))
 }
 
-function extractJson(text: string) {
-  const value = text.trim().replace(/^```json\s*|\s*```$/g, '')
-  return JSON.parse(value) as unknown
+function suggestionList(text: string): unknown[] {
+  const cleaned = text.trim().replace(/^```(?:json)?\s*|\s*```$/gi, '')
+  try {
+    const parsed: unknown = JSON.parse(cleaned)
+    if (Array.isArray(parsed)) return parsed
+    if (parsed && typeof parsed === 'object') {
+      const list = Object.values(parsed).find(Array.isArray)
+      if (list) return list
+    }
+  } catch {
+    // A truncated answer still contains complete objects worth keeping.
+  }
+  return [...cleaned.matchAll(/\{[^{}]*\}/g)].flatMap((match) => {
+    try { return [JSON.parse(match[0]) as unknown] } catch { return [] }
+  })
 }
 
 function suggestionsFrom(value: unknown, lines: ImportLine[], categories: CategoryInput[]) {
@@ -47,26 +59,9 @@ function suggestionsFrom(value: unknown, lines: ImportLine[], categories: Catego
     if (!item || typeof item !== 'object') return []
     const suggestion = item as Partial<AssistantSuggestion>
     const confidence = suggestion.confidence
-    if (typeof suggestion.id !== 'string' || !lineIds.has(suggestion.id) || typeof suggestion.explanation !== 'string' || suggestion.explanation.length > 240 || (confidence !== 'low' && confidence !== 'medium' && confidence !== 'high') || (suggestion.categoryId !== null && (typeof suggestion.categoryId !== 'string' || !categoryIds.has(suggestion.categoryId)))) return []
-    return [{ id: suggestion.id, categoryId: suggestion.categoryId ?? null, confidence, explanation: suggestion.explanation }]
+    if (typeof suggestion.id !== 'string' || !lineIds.has(suggestion.id) || typeof suggestion.explanation !== 'string' || (confidence !== 'low' && confidence !== 'medium' && confidence !== 'high') || (suggestion.categoryId !== null && (typeof suggestion.categoryId !== 'string' || !categoryIds.has(suggestion.categoryId)))) return []
+    return [{ id: suggestion.id, categoryId: suggestion.categoryId ?? null, confidence, explanation: suggestion.explanation.trim().slice(0, 240) }]
   })
-}
-
-async function generateSuggestions(models: string[], apiKey: string, body: string) {
-  for (const model of models) {
-    try {
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body,
-        signal: AbortSignal.timeout(15_000),
-      })
-      if (response.status !== 429 && response.status !== 503) return response
-    } catch {
-      // Try the fallback after a transient network failure or timeout.
-    }
-  }
-  throw new Error('Gemini is unavailable')
 }
 
 export default async function handler(request: ApiRequest, response: ApiResponse) {
@@ -80,7 +75,7 @@ export default async function handler(request: ApiRequest, response: ApiResponse
   if (!token) return send(response, { error: 'Authentification requise.' }, 401)
 
   const payload = request.body
-  if (!isRequest(payload)) return send(response, { error: 'Envoyez entre une et dix lignes avec leurs catégories.' }, 400)
+  if (!isRequest(payload)) return send(response, { error: 'Envoyez entre une et vingt-cinq lignes avec leurs catégories.' }, 400)
 
   const neon = createAuthenticatedNeonClient(token)
   if (!neon) return send(response, { error: 'L’assistant n’est pas configuré.' }, 503)
@@ -88,17 +83,27 @@ export default async function handler(request: ApiRequest, response: ApiResponse
 
   const { data: allowance, error: allowanceError } = await neon.rpc('consume_ai_import_quota')
   if (allowanceError) return send(response, { error: 'Impossible de vérifier le quota de l’assistant.' }, 500)
-  if (!allowance?.allowed) return send(response, { error: allowance?.reason === 'global_limit' ? 'Le budget mensuel de l’assistant est atteint.' : 'Votre quota mensuel pour l’assistant est atteint.' }, 429)
+  if (!allowance?.allowed) return send(response, { error: quotaError(allowance?.reason) }, 429)
 
-  const prompt = `Tu classes des lignes de budget francaises. Propose uniquement une categorie existante, sans creer ni modifier de transaction. Reponds avec un tableau JSON sans markdown: [{"id":"...","categoryId":"... ou null","confidence":"low|medium|high","explanation":"moins de 240 caracteres"}]. Categories: ${JSON.stringify(payload.categories)}. Lignes ambiguës: ${JSON.stringify(payload.lines)}`
+  const prompt = `Tu classes des lignes de budget francaises. Propose uniquement une categorie existante, sans creer ni modifier de transaction. Reponds avec un tableau JSON sans markdown: [{"id":"...","categoryId":"... ou null","confidence":"low|medium|high","explanation":"moins de 120 caracteres"}]. Categories: ${JSON.stringify(payload.categories)}. Lignes ambiguës: ${JSON.stringify(payload.lines)}`
   try {
-    const geminiResponse = await generateSuggestions([...new Set([geminiModel, fallbackModel])], geminiKey, JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: 'application/json', temperature: 0.1, maxOutputTokens: 1200 } }))
+    const { response: geminiResponse, model } = await generateContent(modelChain(geminiModel), geminiKey, JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: 'application/json', temperature: 0.1, maxOutputTokens: 4000 } }))
     if (!geminiResponse.ok) return send(response, { error: 'L’assistant ne peut pas traiter cette demande.' }, 502)
-    const responseBody = await geminiResponse.json() as { candidates?: { content?: { parts?: { text?: string }[] } }[] }
-    const text = responseBody.candidates?.[0]?.content?.parts?.[0]?.text
-    if (!text) return send(response, { error: 'L’assistant n’a renvoyé aucune proposition.' }, 502)
-    return send(response, { suggestions: suggestionsFrom(extractJson(text), payload.lines, payload.categories), estimatedMonthlyCostEur: allowance.estimated_cost_eur, costWarning: allowance.estimated_cost_eur >= 3 })
-  } catch {
+    const responseBody = await geminiResponse.json() as { candidates?: { finishReason?: string; content?: { parts?: { text?: string; thought?: boolean }[] } }[] }
+    const candidate = responseBody.candidates?.[0]
+    const text = (candidate?.content?.parts ?? []).filter((part) => !part.thought).map((part) => part.text ?? '').join('')
+    if (!text.trim()) {
+      console.warn('Gemini returned no text', { model, finishReason: candidate?.finishReason })
+      return send(response, { error: 'L’assistant n’a renvoyé aucune proposition.' }, 502)
+    }
+    const suggestions = suggestionsFrom(suggestionList(text), payload.lines, payload.categories)
+    if (suggestions.length === 0) {
+      console.warn('Gemini suggestions unreadable', { model, finishReason: candidate?.finishReason, sample: text.slice(0, 300) })
+      return send(response, { error: 'L’assistant n’a pas pu proposer de catégorie fiable. Réessayez.' }, 502)
+    }
+    return send(response, { suggestions, model, estimatedDailyCostEur: allowance.estimated_cost_eur, costWarning: allowance.estimated_cost_eur >= dailyWarningThresholdEur })
+  } catch (error) {
+    console.error('Gemini suggestions could not be processed', { error: error instanceof Error ? error.message : String(error) })
     return send(response, { error: 'La réponse de l’assistant est invalide.' }, 502)
   }
 }

@@ -161,3 +161,14 @@ export async function saveBudgetSettings(userId: string, settings: Pick<BudgetSe
 }
 
 export const categoryTypes: CategoryType[] = ['income', 'expense']
+
+// Matches the per-user limit enforced by consume_ai_import_quota().
+export const aiDailyLimit = 20
+
+export async function getAiUsageToday(userId: string) {
+  // The quota rolls over on the database's UTC day, not the local one.
+  const today = new Date().toISOString().slice(0, 10)
+  const { data, error } = await client().from('ai_import_usage').select('request_count').eq('user_id', userId).eq('period_start', today).maybeSingle()
+  if (error) throw error
+  return (data as { request_count: number } | null)?.request_count ?? 0
+}

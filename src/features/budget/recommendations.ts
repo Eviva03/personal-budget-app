@@ -11,10 +11,10 @@ export type Recommendation = {
 export function getRecommendations(summary: BudgetSummary, upcoming: UpcomingCommitment[], formatCurrency = formatAmount): Recommendation[] {
   const recommendations: Recommendation[] = []
 
-  if (summary.freeRemainder < 0) {
-    recommendations.push({ level: 'alert', title: 'Reste libre négatif', message: `Votre projection dépasse votre budget disponible de ${formatCurrency(Math.abs(summary.freeRemainder))} après réserve.` })
-  } else if (summary.projectedRemainder < summary.reserve) {
-    recommendations.push({ level: 'warning', title: 'Réserve exposée', message: `Votre reste projeté ne couvre pas entièrement la réserve de ${formatCurrency(summary.reserve)}.` })
+    if (summary.projectedRemainder < 0) {
+      recommendations.push({ level: 'alert', title: 'Budget dépassé', message: `Vos dépenses, engagements et affectations dépassent vos revenus de ${formatCurrency(Math.abs(summary.projectedRemainder))}, avant même la réserve.` })
+    } else if (summary.freeRemainder < 0) {
+      recommendations.push({ level: 'warning', title: 'Réserve exposée', message: `Votre reste projeté ne couvre pas entièrement la réserve de ${formatCurrency(summary.reserve)} : il manque ${formatCurrency(Math.abs(summary.freeRemainder))}.` })
   } else {
     recommendations.push({ level: 'good', title: 'Marge disponible', message: `Vous conservez votre réserve et disposez de ${formatCurrency(summary.freeRemainder)} de reste libre projeté.` })
   }

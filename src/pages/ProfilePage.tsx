@@ -3,7 +3,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../features/auth/useAuth'
 import { createBudgetBackup } from '../features/budget/backup-export'
-import { getBudgetSettings, listCategories, listCommitments, listTransactions, saveBudgetSettings } from '../features/budget/budget-repository'
+import { getBudgetSettings, listCategories, listCommitments, listGoalAllocations, listSavingsGoals, listTransactions, saveBudgetSettings } from '../features/budget/budget-repository'
 import type { BudgetSettings } from '../features/budget/types'
 import type { BudgetCurrency } from '../features/budget/money'
 import './pages.css'
@@ -63,7 +63,7 @@ export function ProfilePage() {
 	async function downloadBackup() {
 		if (!user) return
 		setExporting(true); setExportError('')
-		try { const [settings, categories, transactions, commitments] = await Promise.all([getBudgetSettings(user.id), listCategories(user.id), listTransactions(user.id), listCommitments(user.id)]); const url = URL.createObjectURL(new Blob([createBudgetBackup({ settings, categories, transactions, commitments })], { type: 'application/json' })); const link = window.document.createElement('a'); link.href = url; link.download = `horizon-sauvegarde-${new Date().toISOString().slice(0, 10)}.json`; link.click(); URL.revokeObjectURL(url) } catch (requestError) { setExportError(requestError instanceof Error ? requestError.message : 'Impossible de créer la sauvegarde.') } finally { setExporting(false) }
+		try { const [settings, categories, transactions, commitments, goals, goal_allocations] = await Promise.all([getBudgetSettings(user.id), listCategories(user.id), listTransactions(user.id), listCommitments(user.id), listSavingsGoals(user.id), listGoalAllocations(user.id)]); const url = URL.createObjectURL(new Blob([createBudgetBackup({ settings, categories, transactions, commitments, goals, goal_allocations })], { type: 'application/json' })); const link = window.document.createElement('a'); link.href = url; link.download = `horizon-sauvegarde-${new Date().toISOString().slice(0, 10)}.json`; link.click(); URL.revokeObjectURL(url) } catch (requestError) { setExportError(requestError instanceof Error ? requestError.message : 'Impossible de créer la sauvegarde.') } finally { setExporting(false) }
 	}
 
 	async function saveCurrencies(event: FormEvent<HTMLFormElement>) {

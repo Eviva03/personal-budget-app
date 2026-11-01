@@ -38,6 +38,23 @@ import type {
 import { neon } from "../../lib/neon";
 
 type TransactionImportProps = { userId: string; onImported: () => void };
+const previewPageSize = 50;
+const maxAssistantLines = 25;
+const insertChunkSize = 200;
+// Rows carry a stable id so editing a label never remounts its inputs and removing a row keeps the others aligned.
+type PreviewTransaction = NewTransaction & { uid: string };
+type PreviewState = Omit<ImportPreview, "valid"> & { valid: PreviewTransaction[] };
+function withUids(transactions: NewTransaction[]): PreviewTransaction[] {
+  return transactions.map((transaction) => ({ ...transaction, uid: crypto.randomUUID() }));
+}
+function fingerprintCounts(transactions: NewTransaction[]) {
+  const counts = new Map<string, number>();
+  transactions.forEach((transaction) => {
+    const key = transactionFingerprint(transaction);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  });
+  return counts;
+}
 type AssistantSuggestion = {
   id: string;
   categoryId: string | null;
@@ -63,7 +80,8 @@ export function TransactionImport({
   userId,
   onImported,
 }: TransactionImportProps) {
-  const [preview, setPreview] = useState<ImportPreview | null>(null);
+  const [preview, setPreview] = useState<PreviewState | null>(null);
+  const [visibleRows, setVisibleRows] = useState(previewPageSize);
   const [categories, setCategories] = useState<Category[]>([]);
   const [history, setHistory] = useState<Transaction[]>([]);
   const [journal, setJournal] = useState<ImportJournalEntry[]>([]);
@@ -106,6 +124,7 @@ export function TransactionImport({
       /\.(jpe?g|png)$/.test(fileName);
     setMessage("");
     setPreview(null);
+    setVisibleRows(previewPageSize);
     setDocumentAnalysis(null);
     setDocumentProposal(null);
     setCommitmentDraft(null);
@@ -161,10 +180,10 @@ export function TransactionImport({
       }
       setPreview({
         ...nextPreview,
-        valid: nextPreview.valid.map((transaction) => ({
+        valid: withUids(nextPreview.valid.map((transaction) => ({
           ...transaction,
           category_id: merchantRuleFor(transaction, rules)?.category_id ?? suggestImport(transaction, availableCategories, transactions).categoryId,
-        })),
+        }))),
       });
     } catch (error) {
       void createImportJournalEntry(userId, {
@@ -186,7 +205,7 @@ export function TransactionImport({
     }
   }
   function updateTransaction(
-    index: number,
+    uid: string,
     field: keyof NewTransaction,
     value: string,
   ) {
@@ -194,8 +213,8 @@ export function TransactionImport({
       current
         ? {
             ...current,
-            valid: current.valid.map((transaction, currentIndex) =>
-              currentIndex === index
+            valid: current.valid.map((transaction) =>
+              transaction.uid === uid
                 ? {
                     ...transaction,
                     [field]:
@@ -209,6 +228,11 @@ export function TransactionImport({
             ),
           }
         : null,
+    );
+  }
+  function removeRow(uid: string) {
+    setPreview((current) =>
+      current ? { ...current, valid: current.valid.filter((transaction) => transaction.uid !== uid) } : null,
     );
   }
   function formatRecurrence(recurrence: "weekly" | "monthly" | "yearly") {
@@ -231,13 +255,12 @@ export function TransactionImport({
     }
     if (!confirmGeminiConsent()) return;
     const lines = preview.valid
-      .map((transaction, index) => ({
+      .map((transaction) => ({
         transaction,
-        index,
         suggestion: suggestImport(transaction, categories, history),
       }))
       .filter(({ suggestion }) => suggestion.confidence !== "high")
-      .slice(0, 10);
+      .slice(0, maxAssistantLines);
     if (lines.length === 0) {
       setMessage("Les lignes importées ont déjà des suggestions locales fiables.");
       return;
@@ -257,8 +280,8 @@ export function TransactionImport({
           authorization: `Bearer ${sessionData.session.access_token}`,
         },
         body: JSON.stringify({
-          lines: lines.map(({ transaction, index }) => ({
-            id: String(index),
+          lines: lines.map(({ transaction }) => ({
+            id: transaction.uid,
             description: transaction.description,
             amount: transaction.amount,
             occurredAt: transaction.occurred_at,
@@ -278,7 +301,7 @@ export function TransactionImport({
       setAssistantSuggestions(body.suggestions ?? []);
       setMessage(
         body.costWarning
-          ? "Propositions reçues. Le budget mensuel de l’assistant approche 3 EUR."
+          ? "Propositions reçues. La limite quotidienne de l’assistant approche."
           : "Propositions reçues. Choisissez celles à appliquer.",
       );
     } catch {
@@ -330,7 +353,9 @@ export function TransactionImport({
           message: body.proposal.explanation,
         }).then(() => loadJournal());
       }
-      if (body.proposal.kind === "bank_statement" && body.proposal.transactions.length > 0) {
+      // The assistant only reads a long statement partially, so it never replaces lines already read locally.
+      const keepsLocalLines = preview.valid.length > 0;
+      if (body.proposal.kind === "bank_statement" && body.proposal.transactions.length > 0 && !keepsLocalLines) {
         const extractedTransactions = body.proposal.transactions.map(
           (transaction) => {
             const draft: NewTransaction = {
@@ -351,9 +376,10 @@ export function TransactionImport({
           current
             ? {
                 ...current,
-                valid: extractedTransactions,
+                valid: withUids(extractedTransactions),
                 errors: [
                   "Opérations proposées par l’assistant. Vérifiez chaque champ avant l’import.",
+                  ...(preview.pdfText && preview.pdfText.length > 12_000 ? ["Document long : seules les premières opérations ont été analysées."] : []),
                 ],
               }
             : current,
@@ -388,8 +414,10 @@ export function TransactionImport({
       );
       setMessage(
         body.costWarning
-          ? "Analyse reçue. Le budget mensuel de l’assistant approche 3 EUR."
-          : "Analyse reçue. Vérifiez la proposition avant toute saisie.",
+          ? "Analyse reçue. La limite quotidienne de l’assistant approche."
+          : body.proposal.kind === "bank_statement" && keepsLocalLines
+            ? `Relevé déjà lu localement : vos ${preview.valid.length} lignes sont conservées telles quelles.`
+            : "Analyse reçue. Vérifiez la proposition avant toute saisie.",
       );
     } catch {
       setMessage("Impossible de joindre l’assistant.");
@@ -519,11 +547,15 @@ export function TransactionImport({
     setSaving(true);
     try {
       const existing = await listTransactions(userId);
-      const fingerprints = new Set(existing.map(transactionFingerprint));
+      const stored = fingerprintCounts(existing);
+      // Only lines already stored are skipped, so identical purchases within one statement are all kept.
       const transactions = preview.valid.filter((transaction) => {
         const fingerprint = transactionFingerprint(transaction);
-        if (fingerprints.has(fingerprint)) return false;
-        fingerprints.add(fingerprint);
+        const count = stored.get(fingerprint) ?? 0;
+        if (count > 0) {
+          stored.set(fingerprint, count - 1);
+          return false;
+        }
         return true;
       });
       if (transactions.length === 0) {
@@ -533,13 +565,17 @@ export function TransactionImport({
         );
         return;
       }
-      await createTransactions(userId, transactions.map((transaction) => ({
+      const rows = transactions.map(({ uid: _uid, ...transaction }) => ({
         ...transaction,
         direction: transaction.direction ?? "expense",
-        review_status: "needs_review",
-        source: "import",
+        review_status: "needs_review" as const,
+        source: "import" as const,
         merchant_name: transaction.merchant_name ?? transaction.description,
-      })));
+      }));
+      // Chunked so a statement of several hundred lines never exceeds a single request's limits.
+      for (let start = 0; start < rows.length; start += insertChunkSize) {
+        await createTransactions(userId, rows.slice(start, start + insertChunkSize));
+      }
       if (journalEntryId) await updateImportJournalEntry(userId, journalEntryId, {
         status: transactions.length === preview.valid.length ? "imported" : "partial",
         imported_count: transactions.length,
@@ -822,15 +858,28 @@ export function TransactionImport({
                       ? "Analyse en cours..."
                       : "Améliorer avec l’assistant"}
                   </button>
+                  <div className="import-summary">
+                    <span>{preview.valid.filter((transaction) => transaction.direction !== "income").length} dépense(s) · {preview.valid.filter((transaction) => transaction.direction === "income").length} revenu(s)</span>
+                    {(() => {
+                      const stored = fingerprintCounts(history);
+                      const duplicates = preview.valid.filter((transaction) => {
+                        const fingerprint = transactionFingerprint(transaction);
+                        const count = stored.get(fingerprint) ?? 0;
+                        if (count > 0) { stored.set(fingerprint, count - 1); return true; }
+                        return false;
+                      }).length;
+                      return duplicates > 0 ? <span>{duplicates} ligne(s) existent déjà et seront ignorées à l’import.</span> : null;
+                    })()}
+                  </div>
                   <div className="import-preview">
-                    {preview.valid.map((transaction, index) => {
+                    {preview.valid.slice(0, visibleRows).map((transaction, index) => {
                       const suggestion = suggestImport(
                         transaction,
                         categories,
                         history,
                       );
                       const assistantSuggestion = assistantSuggestions.find(
-                        (item) => item.id === String(index),
+                        (item) => item.id === transaction.uid,
                       );
                       const assistantCategory = categories.find(
                         (category) =>
@@ -838,26 +887,28 @@ export function TransactionImport({
                       );
                       return <div
                         className="import-row"
-                        key={`${index}-${transactionFingerprint(transaction)}`}
+                        key={transaction.uid}
                       >
                         <input
+                          className="import-field-date"
                           aria-label={`Date de la ligne ${index + 1}`}
                           type="date"
                           value={transaction.occurred_at}
                           onChange={(event) =>
                             updateTransaction(
-                              index,
+                              transaction.uid,
                               "occurred_at",
                               event.target.value,
                             )
                           }
                         />
                         <input
+                          className="import-field-label"
                           aria-label={`Libelle de la ligne ${index + 1}`}
                           value={transaction.description}
                           onChange={(event) =>
                             updateTransaction(
-                              index,
+                              transaction.uid,
                               "description",
                               event.target.value,
                             )
@@ -865,6 +916,7 @@ export function TransactionImport({
                           maxLength={200}
                         />
                         <input
+                          className="import-field-amount"
                           aria-label={`Montant de la ligne ${index + 1}`}
                           type="number"
                           min="0.01"
@@ -872,18 +924,34 @@ export function TransactionImport({
                           value={transaction.amount}
                           onChange={(event) =>
                             updateTransaction(
-                              index,
+                              transaction.uid,
                               "amount",
                               event.target.value,
                             )
                           }
                         />
                         <select
+                          className="import-field-direction"
+                          aria-label={`Sens de la ligne ${index + 1}`}
+                          value={transaction.direction ?? "expense"}
+                          onChange={(event) =>
+                            updateTransaction(
+                              transaction.uid,
+                              "direction",
+                              event.target.value,
+                            )
+                          }
+                        >
+                          <option value="expense">Dépense</option>
+                          <option value="income">Revenu</option>
+                        </select>
+                        <select
+                          className="import-field-category"
                           aria-label={`Categorie de la ligne ${index + 1}`}
                           value={transaction.category_id ?? ""}
                           onChange={(event) =>
                             updateTransaction(
-                              index,
+                              transaction.uid,
                               "category_id",
                               event.target.value,
                             )
@@ -896,6 +964,15 @@ export function TransactionImport({
                             </option>
                           ))}
                         </select>
+                        <button
+                          className="import-remove"
+                          type="button"
+                          title="Retirer cette ligne de l’import"
+                          aria-label={`Retirer la ligne ${index + 1}`}
+                          onClick={() => removeRow(transaction.uid)}
+                        >
+                          <X size={16} aria-hidden="true" />
+                        </button>
                         {(suggestion.reason || suggestion.recurrence || suggestion.installmentCount) && (
                           <p className={`import-suggestion${suggestion.confidence ? ` import-suggestion-${suggestion.confidence}` : ""}`}>
                             {suggestion.reason}
@@ -913,7 +990,7 @@ export function TransactionImport({
                                 type="button"
                                 onClick={() =>
                                   updateTransaction(
-                                    index,
+                                    transaction.uid,
                                     "category_id",
                                     assistantCategory.id,
                                   )
@@ -927,6 +1004,15 @@ export function TransactionImport({
                       </div>
                     })}
                   </div>
+                  {visibleRows < preview.valid.length && (
+                    <button
+                      className="secondary-button"
+                      type="button"
+                      onClick={() => setVisibleRows((current) => current + previewPageSize)}
+                    >
+                      Afficher {Math.min(previewPageSize, preview.valid.length - visibleRows)} ligne(s) de plus ({preview.valid.length - visibleRows} restantes)
+                    </button>
+                  )}
                   <button
                     className="primary-button"
                     type="button"

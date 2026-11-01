@@ -9,6 +9,7 @@ import {
   getBudgetSettings,
   listCategories,
   listCommitments,
+  listGoalAllocations,
   listTransactions,
   saveBudgetSettings,
 } from "../features/budget/budget-repository";
@@ -44,15 +45,16 @@ export function HomePage() {
   useEffect(() => {
     if (!user) return;
     const userId = user.id;
-    async function load() {
-      setLoading(true);
+    async function load(showLoading = true) {
+      if (showLoading) setLoading(true);
       setError("");
       try {
-        const [settings, transactions, commitments, categories] = await Promise.all([
+        const [settings, transactions, commitments, categories, allocations] = await Promise.all([
           getBudgetSettings(userId),
           listTransactions(userId),
           listCommitments(userId),
           listCategories(userId),
+          listGoalAllocations(userId),
         ]);
         if (settings) {
           const nextSummary = calculateBudget({
@@ -61,6 +63,7 @@ export function HomePage() {
             transactions,
             commitments,
             categories,
+            allocations,
           });
           setIncome(String(convertAmount(settings.monthly_income, settings.budget_currency, settings.display_currency)));
           setReserve(String(convertAmount(settings.reserve_amount, settings.budget_currency, settings.display_currency)));
@@ -86,6 +89,9 @@ export function HomePage() {
       }
     }
     void load();
+    const refresh = () => void load(false);
+    window.addEventListener("budget-data-changed", refresh);
+    return () => window.removeEventListener("budget-data-changed", refresh);
   }, [user, budgetCurrency, displayCurrency]);
 
   async function saveSettings(event: FormEvent<HTMLFormElement>) {
@@ -116,10 +122,11 @@ export function HomePage() {
         reserve_amount: reserveAmount,
         payday_day: payday,
       });
-      const [transactions, commitments, categories] = await Promise.all([
+      const [transactions, commitments, categories, allocations] = await Promise.all([
         listTransactions(user.id),
         listCommitments(user.id),
         listCategories(user.id),
+        listGoalAllocations(user.id),
       ]);
       const nextSummary = calculateBudget({
         monthlyIncome,
@@ -127,6 +134,7 @@ export function HomePage() {
         transactions,
         commitments,
         categories,
+        allocations,
       });
       setSummary(nextSummary);
       setForecast(forecastUntilPayday(nextSummary.freeRemainder, commitments, payday));
@@ -234,6 +242,13 @@ export function HomePage() {
                   <strong>{formatAmount(summary.projectedCommitments)}</strong>
                   <small>Mensualises</small>
                 </article>
+                {summary.allocatedToGoals > 0 && (
+                  <article className="summary-card">
+                    <span>Épargne affectée</span>
+                    <strong>{formatAmount(summary.allocatedToGoals)}</strong>
+                    <small>Réservé à vos objectifs</small>
+                  </article>
+                )}
                 <article className="summary-card emphasis">
                   <span>Reste projeté</span>
                   <strong>{formatAmount(summary.projectedRemainder)}</strong>

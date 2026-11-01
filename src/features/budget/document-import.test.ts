@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { parseTransactionsCsv, parseTransactionsPdfText, suggestCategoryId, transactionFingerprint } from './document-import'
 
 describe('parseTransactionsCsv', () => {
@@ -48,5 +48,53 @@ describe('parseTransactionsCsv', () => {
 
   it('suggests an existing category from a merchant label', () => {
     expect(suggestCategoryId('CARREFOUR CITY', [{ id: 'food', user_id: 'u', name: 'Alimentation', color: '#000000', type: 'expense', created_at: '' }])).toBe('food')
+  })
+
+  it('keeps merchants whose name contains total or solde', () => {
+    const preview = parseTransactionsPdfText('Date Description Montant 7 octobre TOTAL ACCESS 0452 -52,65 € 8 octobre SOLDE ET DESTOCKAGE SARL -19,90 € 9 octobre SOLDE -1 234,56 €')
+    expect(preview.valid.map((item) => item.description)).toEqual(['TOTAL ACCESS 0452', 'SOLDE ET DESTOCKAGE SARL'])
+  })
+
+  it('does not absorb reference numbers into the amount', () => {
+    const preview = parseTransactionsPdfText('Date Description Montant 5 octobre CARTE 1234 24,50 € 6 octobre VIR 2 100,00 € 7 octobre RETRAIT -1.234,56 €')
+    expect(preview.valid.map((item) => [item.description, item.amount])).toEqual([['CARTE 1234', 24.5], ['VIR', 2100], ['RETRAIT', 1234.56]])
+  })
+
+  it('marks unsigned amounts as income only when the statement prints signs', () => {
+    const signed = parseTransactionsPdfText('Date Description Montant 5 octobre CARREFOUR -24,50 € 6 octobre VIR SALAIRE 2 100,00 €')
+    expect(signed.valid.map((item) => item.direction)).toEqual([undefined, 'income'])
+    const unsigned = parseTransactionsPdfText('Date Description Montant 5 octobre CARREFOUR 24,50 € 6 octobre NETFLIX 13,99 €')
+    expect(unsigned.valid.map((item) => item.direction)).toEqual([undefined, undefined])
+  })
+
+  it('reads separate debit and credit CSV columns and keeps the direction', () => {
+    const preview = parseTransactionsCsv('Date;Libellé;Débit;Crédit\n05/10/2026;CARREFOUR;24,50;\n06/10/2026;VIR SALAIRE;;2 100,00')
+    expect(preview.valid.map((item) => [item.description, item.amount, item.direction])).toEqual([['CARREFOUR', 24.5, undefined], ['VIR SALAIRE', 2100, 'income']])
+  })
+
+  it('uses the previous year for operations dated well after today', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2027, 0, 10))
+    try {
+      const preview = parseTransactionsPdfText('Date Description Montant 28 décembre BOULANGERIE -4,20 € 3 janvier NETFLIX -13,99 €')
+      expect(preview.valid.map((item) => item.occurred_at)).toEqual(['2026-12-28', '2027-01-03'])
+    } finally { vi.useRealTimers() }
+  })
+
+  it('reads a 300-line multi-page statement without losing or reclassifying lines', () => {
+    const merchants = ['CARREFOUR CITY 1234', 'NETFLIX.COM', 'TOTAL ACCESS 0452', 'VIR SALAIRE ACME SAS', 'BOULANGERIE PAUL', 'AMAZON EU SARL']
+    const pages = Array.from({ length: 6 }, (_, page) => {
+      const rows = Array.from({ length: 50 }, (_, line) => {
+        const index = page * 50 + line
+        const merchant = merchants[index % merchants.length]
+        const amount = merchant.startsWith('VIR') ? '2 100,00' : `-${10 + (index % 90)},${String((index * 13) % 100).padStart(2, '0')}`
+        return `${(index % 27) + 1} octobre ${merchant} ${amount} €`
+      })
+      return `Releve de compte page ${page + 1} Date Description Montant ${rows.join(' ')} Solde en fin de page 1 234,56 €`
+    })
+    const preview = parseTransactionsPdfText(pages.join('\n'))
+    expect(preview.valid).toHaveLength(300)
+    expect(preview.valid.filter((item) => item.direction === 'income')).toHaveLength(50)
+    expect(preview.errors).toEqual([])
   })
 })
