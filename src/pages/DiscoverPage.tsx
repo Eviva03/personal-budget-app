@@ -49,6 +49,37 @@ export function DiscoverPage() {
           </article>
         ))}
       </div>
+      <section className="discover-story" aria-labelledby="horizon-origin">
+        <h2 id="horizon-origin">Pourquoi Horizon ?</h2>
+        <p>
+          Horizon est né d’un besoin personnel : mieux organiser mes finances,
+          anticiper mes dépenses et savoir ce que je peux réellement utiliser
+          sans compromettre mes engagements ni mon épargne.
+        </p>
+        <p>
+          J’ai voulu aller au-delà d’une simple liste de transactions : réunir
+          le suivi du budget, les échéances et les objectifs d’épargne pour avoir
+          une vision plus claire des semaines à venir. L’analyse chiffrée et
+          l’assistant optionnel apportent un éclairage complémentaire, tout en
+          laissant chaque décision entre les mains de l’utilisateur.
+        </p>
+        <p className="discover-author">Conçu et développé par Charles Ben NKOLO.</p>
+      </section>
+      <section className="discover-story" aria-labelledby="horizon-projections">
+        <h2 id="horizon-projections">Une projection, pas un solde bancaire</h2>
+        <p>
+          Le reste libre tient compte des revenus, des dépenses enregistrées,
+          des engagements mensualisés, de l’épargne affectée et de la réserve
+          à conserver. Il dépend des informations renseignées dans Horizon :
+          une opération manquante ou un engagement déjà payé mais également
+          saisi comme dépense peut modifier la projection.
+        </p>
+        <p>
+          Horizon ne consulte pas votre compte bancaire en temps réel.
+          Ses projections et les propositions de l’assistant aident à anticiper,
+          mais ne constituent pas un conseil financier.
+        </p>
+      </section>
       <section className="discover-privacy">
         <ShieldCheck size={19} aria-hidden="true" />
         <p>

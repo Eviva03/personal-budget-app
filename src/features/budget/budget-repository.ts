@@ -1,4 +1,5 @@
 import { neon } from '../../lib/neon'
+import { pendingDeletions } from './pending-deletions'
 import type { BudgetSettings, Category, CategoryType, Commitment, GoalAllocation, ImportJournalEntry, MerchantRule, NewCommitment, NewTransaction, SavingsGoal, Transaction } from './types'
 
 function client() {
@@ -32,7 +33,7 @@ export async function deleteCategory(userId: string, categoryId: string) {
 export async function listTransactions(userId: string) {
   const { data, error } = await client().from('transactions').select('*').eq('user_id', userId).order('occurred_at', { ascending: false })
   if (error) throw error
-  return data as Transaction[]
+  return (data as Transaction[]).filter((entry) => !pendingDeletions.hides(userId, 'transactions', entry.id))
 }
 
 export async function createTransaction(userId: string, transaction: NewTransaction) {
@@ -54,15 +55,18 @@ export async function updateTransaction(userId: string, transactionId: string, c
   return data as Transaction
 }
 
-export async function deleteTransaction(userId: string, transactionId: string) {
-  const { error } = await client().from('transactions').delete().eq('id', transactionId).eq('user_id', userId)
-  if (error) throw error
+export async function deleteTransaction(userId: string, transactionId: string, label = 'Transaction') {
+  pendingDeletions.schedule({ userId, table: 'transactions', recordId: transactionId, label }, async () => {
+    const { data, error } = await client().from('transactions').delete().eq('id', transactionId).eq('user_id', userId).select('id')
+    if (error) throw error
+    if (!data?.length) throw new Error('La transaction n’a pas pu être supprimée. Actualisez la page.')
+  })
 }
 
 export async function listCommitments(userId: string) {
   const { data, error } = await client().from('commitments').select('*').eq('user_id', userId).order('due_date')
   if (error) throw error
-  return data as Commitment[]
+  return (data as Commitment[]).filter((entry) => !pendingDeletions.hides(userId, 'commitments', entry.id))
 }
 
 export async function createCommitment(userId: string, commitment: NewCommitment) {
@@ -84,9 +88,12 @@ export async function updateCommitment(userId: string, commitmentId: string, cha
   return data as Commitment
 }
 
-export async function deleteCommitment(userId: string, commitmentId: string) {
-  const { error } = await client().from('commitments').delete().eq('id', commitmentId).eq('user_id', userId)
-  if (error) throw error
+export async function deleteCommitment(userId: string, commitmentId: string, label = 'Engagement') {
+  pendingDeletions.schedule({ userId, table: 'commitments', recordId: commitmentId, label }, async () => {
+    const { data, error } = await client().from('commitments').delete().eq('id', commitmentId).eq('user_id', userId).select('id')
+    if (error) throw error
+    if (!data?.length) throw new Error('L’engagement n’a pas pu être supprimé. Actualisez la page.')
+  })
 }
 
 export async function listSavingsGoals(userId: string) {

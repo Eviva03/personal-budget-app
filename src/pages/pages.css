@@ -2671,6 +2671,29 @@ select:focus-visible {
   padding: 17px 0;
   border-top-color: #bcd4cd;
 }
+.discover-story {
+  margin-top: 28px;
+  padding: 24px 0 0;
+  border-top: 1px solid #d5e0ea;
+}
+.discover-story h2 {
+  margin: 0 0 12px;
+  font-family: 'Sora', sans-serif;
+  font-size: 20px;
+  line-height: 1.4;
+  letter-spacing: 0;
+}
+.discover-story p {
+  max-width: 72ch;
+  margin: 0 0 14px;
+  color: #526477;
+  line-height: 1.75;
+  overflow-wrap: anywhere;
+}
+.discover-story .discover-author {
+  color: #18212b;
+  font-weight: 600;
+}
 .discover-start {
   display: inline-flex;
   align-items: center;

@@ -151,6 +151,20 @@
   display: none;
 }
 
+.app-attribution {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin-top: 40px;
+  padding: 16px 64px 0 0;
+  border-top: 1px solid #d5e0ea;
+  color: #526477;
+  font-size: 12px;
+  line-height: 1.7;
+  letter-spacing: 0;
+  overflow-wrap: anywhere;
+}
+
 .global-add {
   position: fixed;
   right: 24px;

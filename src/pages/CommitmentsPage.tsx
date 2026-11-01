@@ -74,7 +74,7 @@ export function CommitmentsPage() {
   async function remove(item: Commitment) {
     if (!user || !window.confirm(`Supprimer « ${item.description} » ?`)) return
     try {
-      await deleteCommitment(user.id, item.id)
+      await deleteCommitment(user.id, item.id, item.description)
       setItems((current) => current.filter((entry) => entry.id !== item.id))
       window.dispatchEvent(new Event('budget-data-changed'))
     } catch (requestError) { setActionError(requestError instanceof Error ? requestError.message : 'Impossible de supprimer l’engagement.') }

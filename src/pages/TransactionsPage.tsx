@@ -139,7 +139,7 @@ export function TransactionsPage() {
   async function remove(item: Transaction) {
     if (!user || !window.confirm(`Supprimer « ${item.description} » ?`)) return;
     try {
-      await deleteTransaction(user.id, item.id);
+      await deleteTransaction(user.id, item.id, item.description);
       setItems((current) => current.filter((entry) => entry.id !== item.id));
       window.dispatchEvent(new Event("budget-data-changed"));
     } catch (requestError) {

@@ -1,0 +1,89 @@
+.deletion-undo {
+  position: fixed;
+  z-index: 45;
+  right: 96px;
+  bottom: 24px;
+  width: min(440px, calc(100vw - 128px));
+  max-height: 35svh;
+  padding: 14px 16px;
+  overflow-y: auto;
+  border: 1px solid #bcd4cd;
+  border-radius: 8px;
+  background: #f8fcfa;
+  color: #18212b;
+  box-shadow: 0 6px 24px rgb(24 33 43 / 18%);
+  font-size: 14px;
+  letter-spacing: 0;
+}
+
+.deletion-undo .deletion-undo-heading {
+  margin: 0 0 10px;
+  color: #526477;
+  font-size: 12px;
+}
+
+.deletion-undo ul {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.deletion-undo li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.deletion-undo li > div {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.deletion-undo li p {
+  margin: 4px 0 0;
+  color: #526477;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.deletion-undo button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  gap: 6px;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 1px solid #387c70;
+  border-radius: 6px;
+  color: #215d50;
+  background: #e8f7f0;
+  font: inherit;
+  cursor: pointer;
+}
+
+.deletion-undo button:hover {
+  background: #d6eee2;
+}
+
+.deletion-undo button:focus-visible {
+  outline: 2px solid #387c70;
+  outline-offset: 3px;
+}
+
+.deletion-undo .deletion-undo-dismiss {
+  width: 44px;
+  padding: 0;
+}
+
+@media (max-width: 768px) {
+  .deletion-undo {
+    right: 12px;
+    bottom: calc(150px + env(safe-area-inset-bottom));
+    width: calc(100vw - 24px);
+    max-height: 30svh;
+  }
+}

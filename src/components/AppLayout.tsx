@@ -79,6 +79,10 @@ export function AppLayout({ children }: AppLayoutProps) {
       <main className="main-content">
         {!online && <p className="offline-notice" role="status">Vous êtes hors ligne : vos données ne peuvent pas être chargées ni enregistrées pour le moment.</p>}
         {children}
+        <footer className="app-attribution">
+          <span>© {new Date().getFullYear()} Charles Ben NKOLO</span>
+          <span>Conception et développement d’Horizon</span>
+        </footer>
       </main>
       <nav ref={mobileNavRef} onScroll={updateHiddenTabs} className={`mobile-navigation${hiddenTabs.left ? ' has-left' : ''}${hiddenTabs.right ? ' has-right' : ''}`} aria-label="Navigation principale">
         {navigation.map(({ to, label, icon: Icon }) => (

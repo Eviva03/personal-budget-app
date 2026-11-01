@@ -2,6 +2,7 @@ import { Plus } from 'lucide-react'
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import { AppLayout } from './components/AppLayout'
+import { DeletionUndo } from './components/DeletionUndo'
 import { ProtectedRoute } from './features/auth/ProtectedRoute'
 import { useAuth } from './features/auth/useAuth'
 import { AddBudgetModal } from './features/budget/AddBudgetModal'
@@ -70,6 +71,7 @@ function App() {
         navigate('/', { replace: true })
       }} />}
       <PwaInstallPrompt />
+      <DeletionUndo />
     </AppLayout>
   )
 }
